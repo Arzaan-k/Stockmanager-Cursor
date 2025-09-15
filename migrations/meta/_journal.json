@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1756797620845,
+      "tag": "0000_freezing_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1756797620846,
+      "tag": "0001_add_whatsapp_tables",
+      "breakpoints": true
+    }
+  ]
+}

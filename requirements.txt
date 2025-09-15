@@ -1,0 +1,37 @@
+# Python dependencies for StockSmartHub Data Processor
+
+# Core data processing
+pandas>=1.5.0
+openpyxl>=3.0.10
+
+# Web requests and image handling
+requests>=2.28.0
+Pillow>=9.0.0
+
+# Database (sqlite3 is built into Python - no installation needed)
+
+# Additional utilities (already built into Python)
+# - csv
+# - os  
+# - logging
+# - time
+# - json
+# - hashlib
+# - urllib.parse
+# - typing
+# - re
+# - shutil
+
+# Optional: If you want to use MySQL instead of SQLite
+# pymysql>=1.0.2
+# mysql-connector-python>=8.0.32
+
+# Optional: For PostgreSQL database
+# psycopg2-binary>=2.9.5
+
+# Optional: For enhanced image processing
+# opencv-python>=4.7.0
+# numpy>=1.24.0
+
+# Optional: For API keys management
+# python-dotenv>=1.0.0

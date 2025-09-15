@@ -1,0 +1,225 @@
+Smart Stock & Order Management Dashboard (Shopify-like with WhatsApp Integration)
+1. Introduction
+1.1 Purpose
+
+The purpose of this application is to provide a smart and simplified stock and order management system (similar to Shopify’s Products and Orders dashboard). It is tailored for spare parts/inventory tracking across multiple warehouses with WhatsApp-based AI stock update support, PWA availability, and a user-friendly interface for both tech-enabled and non-tech-enabled users.
+
+1.2 Scope
+
+The system will allow:
+
+Orders Section: Manage, track, and create customer orders.
+
+Products Section: Manage stock, product information, warehouse locations, and usage tracking.
+
+Smart WhatsApp Integration: Update inventory or create orders by sending product images and interacting with an AI assistant.
+
+PWA Support: Work seamlessly across desktop and mobile devices offline/online.
+
+Analytics & Usage Tracking: Monitor how many items are used vs. unused, usage history, warehouse box tracking, and movement logs.
+
+Target users: Small & medium businesses managing spare parts, warehouses, or distribution.
+
+2. System Overview
+
+Frontend: PWA (React + Tailwind + Service Workers).
+
+Backend: Node.js (Express/NestJS) with REST APIs.
+
+Database: PostgreSQL (with Prisma ORM).
+
+WhatsApp Integration: Meta Cloud API / Twilio + AI recognition (OCR/barcode/CLIP model).
+
+AI Features:
+
+Product recognition from images.
+
+Conversational AI flow for order/stock updates via WhatsApp.
+
+Cloud Hosting: AWS/GCP/Azure with containerized services (Docker).
+
+3. Functional Requirements
+3.1 Products Module
+
+Create, update, delete products.
+
+Track product details:
+
+Name, type, stock type, SKU, description.
+
+Stock count (total, used, unused).
+
+Usage history: when, where, how many times used.
+
+Warehouse mapping:
+
+Warehouse name.
+
+Location (city, GPS coordinates).
+
+Inside warehouse → aisle, rack, box number.
+
+Search & filter products.
+
+View real-time inventory levels.
+
+Upload bulk product data via CSV/Excel.
+
+3.2 Orders Module
+
+Create, view, update, delete orders.
+
+Order details:
+
+Customer name, contact, location.
+
+Products ordered, quantities.
+
+Status: Pending, Shipped, Delivered, Cancelled.
+
+Smart order creation UI:
+
+Works like an e-commerce cart.
+
+Add customer details + products in order.
+
+Order tracking & fulfillment history.
+
+3.3 Inventory Tracking & Usage Logs
+
+System automatically tracks usage:
+
+Out of X total stock, Y are used.
+
+Log details: date, user, location, purpose.
+
+Audit trail of every stock movement (add, remove, transfer).
+
+Generate usage reports (daily, monthly, warehouse-wise).
+
+3.4 WhatsApp Integration
+
+Update stock by sending product photo.
+
+AI identifies product → asks: “Add stock or use stock?”
+
+For “use stock”: ask customer details → create order.
+
+For “add stock”: ask quantity → update inventory.
+
+Handle multiple warehouses in stock update flow.
+
+Conversational history stored in DB.
+
+3.5 Analytics & Reports
+
+Dashboard view:
+
+Products: total, used, unused.
+
+Orders: total, pending, completed.
+
+Stock usage over time.
+
+Warehouse stock distribution.
+
+Export reports (Excel, PDF).
+
+4. Non-Functional Requirements
+
+Performance: Handle 10,000+ products and 5,000+ orders with <1s response time.
+
+Availability: 99.9% uptime with cloud deployment.
+
+Scalability: Multi-warehouse support, multi-user roles.
+
+Security: JWT authentication, role-based access (Admin, Staff, Viewer).
+
+PWA: Offline caching, mobile-first design, push notifications.
+
+Ease of Use: UI like Shopify → clean, modern, intuitive.
+
+Localization: Multi-language support.
+
+Auditability: Every stock change logged.
+
+5. System Design Overview
+5.1 Modules
+
+Frontend PWA (React + Tailwind + Service Worker)
+
+Products Dashboard.
+
+Orders Dashboard.
+
+Create Order UI (cart-style).
+
+Warehouse map view.
+
+Backend API (Node.js/Express or NestJS)
+
+Products API.
+
+Orders API.
+
+Inventory update API.
+
+WhatsApp webhook handler.
+
+Database (PostgreSQL)
+
+Products table.
+
+Warehouses table.
+
+Orders table.
+
+Customers table.
+
+Stock movements table.
+
+WhatsApp interactions table.
+
+AI Services
+
+OCR/barcode detection.
+
+Image → Product recognition (CLIP model).
+
+WhatsApp chatbot flow handler.
+
+6. Database Schema (High-Level)
+
+Products: id, name, type, sku, stock_total, stock_used, stock_unused.
+
+Warehouses: id, name, location, gps_coords.
+
+WarehouseStock: product_id, warehouse_id, quantity, aisle, rack, box_number.
+
+Orders: id, customer_id, status, date.
+
+OrderItems: order_id, product_id, quantity.
+
+Customers: id, name, phone, address.
+
+StockMovements: id, product_id, action (add/use/transfer), qty, user, timestamp, warehouse_id.
+
+WhatsAppLogs: id, user_phone, product_id, action, qty, timestamp.
+
+7. User Roles
+
+Admin: Full access.
+
+Staff: Add/update stock, create orders.
+
+Viewer: Read-only access to inventory/orders.
+
+8. Future Enhancements
+
+Barcode scanning in PWA.
+
+AI-powered demand forecasting.
+
+Integration with accounting/ERP.
+
+Voice command support for stock updates.

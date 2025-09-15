@@ -1,0 +1,10 @@
+Group Code,Group Name,Crystal Part Code,List of Items,Photos,MFG Part Code,Importance,High Value,Maximum Usage Per Month,6 Months Usage,Average per day,Lead Time days,Critical Factor - One Day,Units,Minimum Inventory Per Day,Maximum Inventory Per Day,CURRENT STOCK AVAILABLE
+1,Daikin,Q-001001,Daikin Reefer Unit,https://via.placeholder.com/800x600/757575/FFFFFF?text=Daikin%20Reefer%20Unit,,Critical,,4,24,0.13,9,2,Nos.,2,4,10
+1,Daikin,Q-001002,Daikin HP Switch,https://via.placeholder.com/800x600/FFC107/FFFFFF?text=Electrical,2536721,Critical,Yes,5,30,0.17,5,2,Nos.,2,5,15
+1,Daikin,Q-001003,Daikin Data Recorder Sensor,https://via.placeholder.com/800x600/2196F3/FFFFFF?text=Sensor,2509541,Critical,,0,0,0,10,2,Nos.,0,0,5
+2,Carrier,Q-002001,Carrier Thinline Reefer Unit,,,High,,2,12,0.07,5,1,Nos.,0,2,8
+2,Carrier,Q-002002,Carrier Eliteline Reefer Unit,,,High,,0,0,0,5,1,Nos.,0,0,3
+3,Thermoking,Q-003001,TK-4000 Reefer Unit,,,High,,1,6,0.03,5,1,Nos.,0,1,12
+4,Paint,Q-004001,Paint RAL5002 (BLUE),,,Critical,,60,360,2,10,2,Nos.,40,60,25
+5,Gas,Q-005001,Refrigerant Gas - R134a,,,Critical,,20,120,0.67,15,2,Kg,20,20,50
+6,Electrical,Q-006001,LED Light 20W,,,Critical,,30,180,1,10,2,PCS,20,30,45

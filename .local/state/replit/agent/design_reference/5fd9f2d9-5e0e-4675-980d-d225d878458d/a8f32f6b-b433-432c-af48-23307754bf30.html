@@ -1,0 +1,913 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Stock & Order Management Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    },
+                    colors: {
+                        background: "var(--background)",
+                        foreground: "var(--foreground)",
+                        card: {
+                            DEFAULT: "var(--card)",
+                            foreground: "var(--card-foreground)",
+                        },
+                        primary: {
+                            DEFAULT: "var(--primary)",
+                            foreground: "var(--primary-foreground)",
+                        },
+                        secondary: {
+                            DEFAULT: "var(--secondary)",
+                            foreground: "var(--secondary-foreground)",
+                        },
+                        muted: {
+                            DEFAULT: "var(--muted)",
+                            foreground: "var(--muted-foreground)",
+                        },
+                        accent: {
+                            DEFAULT: "var(--accent)",
+                            foreground: "var(--accent-foreground)",
+                        },
+                        destructive: {
+                            DEFAULT: "var(--destructive)",
+                            foreground: "var(--destructive-foreground)",
+                        },
+                        border: "var(--border)",
+                        input: "var(--input)",
+                        ring: "var(--ring)",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "system-ui", "sans-serif"],
+                    }
+                },
+            }
+        };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: hsl(0 0% 98%);
+            --foreground: hsl(224 71% 4%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(224 71% 4%);
+            --primary: hsl(220 98% 61%);
+            --primary-foreground: hsl(210 20% 98%);
+            --secondary: hsl(220 14% 96%);
+            --secondary-foreground: hsl(220 9% 46%);
+            --muted: hsl(220 14% 96%);
+            --muted-foreground: hsl(220 9% 46%);
+            --accent: hsl(220 14% 96%);
+            --accent-foreground: hsl(220 9% 46%);
+            --destructive: hsl(0 84% 60%);
+            --destructive-foreground: hsl(210 20% 98%);
+            --border: hsl(220 13% 91%);
+            --input: hsl(220 13% 91%);
+            --ring: hsl(220 98% 61%);
+            --radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground font-sans">
+    <!-- @COMPONENT: MainLayout -->
+    <div class="flex h-screen bg-background">
+        <!-- Sidebar Navigation -->
+        <!-- @COMPONENT: Sidebar -->
+        <aside class="w-64 bg-card border-r border-border flex flex-col">
+            <div class="p-6 border-b border-border">
+                <h1 class="text-xl font-semibold text-foreground">StockFlow</h1>
+                <p class="text-sm text-muted-foreground">Smart Inventory Management</p>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="#" class="nav-item active flex items-center px-3 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground" data-section="dashboard">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"></path>
+                    </svg>
+                    Dashboard
+                </a>
+                
+                <a href="#" class="nav-item flex items-center px-3 py-2 text-sm font-medium rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground" data-section="products">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    Products
+                </a>
+                
+                <a href="#" class="nav-item flex items-center px-3 py-2 text-sm font-medium rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground" data-section="orders">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Orders
+                </a>
+                
+                <a href="#" class="nav-item flex items-center px-3 py-2 text-sm font-medium rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground" data-section="warehouses">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    Warehouses
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
+                        A
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium" data-mock="true">Admin User</div>
+                        <div class="text-xs text-muted-foreground" data-mock="true">admin@stockflow.com</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <!-- @END_COMPONENT: Sidebar -->
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-auto">
+            <!-- Dashboard Section -->
+            <!-- @COMPONENT: DashboardView -->
+            <div id="dashboard-section" class="section-content p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-semibold text-foreground">Dashboard</h2>
+                    <p class="text-muted-foreground">Overview of your inventory and orders</p>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-blue-100 rounded-lg">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Total Products</p>
+                                <p class="text-2xl font-semibold text-foreground" data-mock="true">1,247</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-green-100 rounded-lg">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Active Orders</p>
+                                <p class="text-2xl font-semibold text-foreground" data-mock="true">89</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-orange-100 rounded-lg">
+                                <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Low Stock Items</p>
+                                <p class="text-2xl font-semibold text-foreground" data-mock="true">23</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-purple-100 rounded-lg">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-muted-foreground">Warehouses</p>
+                                <p class="text-2xl font-semibold text-foreground" data-mock="true">5</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity & Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <h3 class="text-lg font-semibold mb-4">Recent Orders</h3>
+                        <div class="space-y-4">
+                            <!-- @MAP: recentOrders.map(order => ( -->
+                            <div class="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                <div>
+                                    <p class="font-medium" data-mock="true">Order #ORD-001</p>
+                                    <p class="text-sm text-muted-foreground" data-mock="true">Customer: John Manufacturing</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-medium" data-mock="true">$2,450</p>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-mock="true">Shipped</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                <div>
+                                    <p class="font-medium" data-mock="true">Order #ORD-002</p>
+                                    <p class="text-sm text-muted-foreground" data-mock="true">Customer: Tech Solutions Ltd</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-medium" data-mock="true">$1,890</p>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" data-mock="true">Pending</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                <div>
+                                    <p class="font-medium" data-mock="true">Order #ORD-003</p>
+                                    <p class="text-sm text-muted-foreground" data-mock="true">Customer: AutoParts Direct</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-medium" data-mock="true">$975</p>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" data-mock="true">Processing</span>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <h3 class="text-lg font-semibold mb-4">Low Stock Alerts</h3>
+                        <div class="space-y-4">
+                            <!-- @MAP: lowStockItems.map(item => ( -->
+                            <div class="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                <div>
+                                    <p class="font-medium" data-mock="true">Brake Pad Set - BP-001</p>
+                                    <p class="text-sm text-muted-foreground" data-mock="true">Warehouse A - Aisle 3, Rack B</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-destructive font-medium" data-mock="true">5 remaining</p>
+                                    <p class="text-xs text-muted-foreground" data-mock="true">Min: 10</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                <div>
+                                    <p class="font-medium" data-mock="true">Air Filter - AF-205</p>
+                                    <p class="text-sm text-muted-foreground" data-mock="true">Warehouse B - Aisle 1, Rack C</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-destructive font-medium" data-mock="true">2 remaining</p>
+                                    <p class="text-xs text-muted-foreground" data-mock="true">Min: 15</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                <div>
+                                    <p class="font-medium" data-mock="true">Oil Filter - OF-120</p>
+                                    <p class="text-sm text-muted-foreground" data-mock="true">Warehouse A - Aisle 2, Rack A</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-destructive font-medium" data-mock="true">8 remaining</p>
+                                    <p class="text-xs text-muted-foreground" data-mock="true">Min: 20</p>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: DashboardView -->
+
+            <!-- Products Section -->
+            <!-- @COMPONENT: ProductsView -->
+            <div id="products-section" class="section-content hidden p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-foreground">Products</h2>
+                        <p class="text-muted-foreground">Manage your inventory and stock levels</p>
+                    </div>
+                    <button class="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors" data-event="click:openAddProductModal">
+                        Add Product
+                    </button>
+                </div>
+
+                <!-- Search and Filter Bar -->
+                <div class="bg-card rounded-lg border border-border p-4 mb-6">
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1">
+                            <input type="text" placeholder="Search products..." class="w-full px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                        </div>
+                        <div class="flex gap-2">
+                            <select class="px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                                <option>All Categories</option>
+                                <option>Brake Parts</option>
+                                <option>Engine Parts</option>
+                                <option>Filters</option>
+                            </select>
+                            <select class="px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                                <option>All Warehouses</option>
+                                <option>Warehouse A</option>
+                                <option>Warehouse B</option>
+                                <option>Warehouse C</option>
+                            </select>
+                            <button class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md font-medium hover:bg-secondary/80 transition-colors">
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Table -->
+                <div class="bg-card rounded-lg border border-border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Product</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SKU</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Category</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Stock</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Used/Unused</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Location</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-card divide-y divide-border">
+                                <!-- @MAP: products.map(product => ( -->
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                                <svg class="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-foreground" data-mock="true">Brake Pad Set</div>
+                                                <div class="text-sm text-muted-foreground" data-mock="true">Premium ceramic brake pads</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">BP-001</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Brake Parts</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" data-mock="true">5 Low</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">95 / 5</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground" data-mock="true">WH-A, A3-B-12</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:editProduct">Edit</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:adjustStock">Adjust Stock</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                                <svg class="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-foreground" data-mock="true">Air Filter</div>
+                                                <div class="text-sm text-muted-foreground" data-mock="true">High-efficiency air filter</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">AF-205</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Filters</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" data-mock="true">2 Critical</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">48 / 2</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground" data-mock="true">WH-B, B1-C-08</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:editProduct">Edit</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:adjustStock">Adjust Stock</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                                <svg class="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-foreground" data-mock="true">Oil Filter</div>
+                                                <div class="text-sm text-muted-foreground" data-mock="true">Premium oil filter cartridge</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">OF-120</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Filters</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" data-mock="true">8 Low</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">72 / 8</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground" data-mock="true">WH-A, A2-A-15</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:editProduct">Edit</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:adjustStock">Adjust Stock</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                                <svg class="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-foreground" data-mock="true">Spark Plug Set</div>
+                                                <div class="text-sm text-muted-foreground" data-mock="true">Platinum spark plug 4-pack</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">SP-055</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Engine Parts</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-mock="true">45 Good</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">35 / 45</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground" data-mock="true">WH-C, C1-D-22</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:editProduct">Edit</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:adjustStock">Adjust Stock</button>
+                                    </td>
+                                </tr>
+                                <!-- @END_MAP )) -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="px-6 py-4 border-t border-border">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-muted-foreground" data-mock="true">
+                                Showing 1 to 4 of 1,247 products
+                            </div>
+                            <div class="flex space-x-2">
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">Previous</button>
+                                <button class="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md">1</button>
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">2</button>
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">3</button>
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: ProductsView -->
+
+            <!-- Orders Section -->
+            <!-- @COMPONENT: OrdersView -->
+            <div id="orders-section" class="section-content hidden p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-foreground">Orders</h2>
+                        <p class="text-muted-foreground">Manage customer orders and fulfillment</p>
+                    </div>
+                    <button class="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors" data-event="click:openCreateOrderModal">
+                        Create Order
+                    </button>
+                </div>
+
+                <!-- Order Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-card rounded-lg border border-border p-4">
+                        <div class="text-sm text-muted-foreground">Total Orders</div>
+                        <div class="text-2xl font-semibold text-foreground" data-mock="true">89</div>
+                    </div>
+                    <div class="bg-card rounded-lg border border-border p-4">
+                        <div class="text-sm text-muted-foreground">Pending</div>
+                        <div class="text-2xl font-semibold text-yellow-600" data-mock="true">12</div>
+                    </div>
+                    <div class="bg-card rounded-lg border border-border p-4">
+                        <div class="text-sm text-muted-foreground">Shipped</div>
+                        <div class="text-2xl font-semibold text-blue-600" data-mock="true">45</div>
+                    </div>
+                    <div class="bg-card rounded-lg border border-border p-4">
+                        <div class="text-sm text-muted-foreground">Delivered</div>
+                        <div class="text-2xl font-semibold text-green-600" data-mock="true">32</div>
+                    </div>
+                </div>
+
+                <!-- Search and Filter -->
+                <div class="bg-card rounded-lg border border-border p-4 mb-6">
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1">
+                            <input type="text" placeholder="Search orders..." class="w-full px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                        </div>
+                        <div class="flex gap-2">
+                            <select class="px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                                <option>All Status</option>
+                                <option>Pending</option>
+                                <option>Processing</option>
+                                <option>Shipped</option>
+                                <option>Delivered</option>
+                                <option>Cancelled</option>
+                            </select>
+                            <select class="px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                                <option>All Dates</option>
+                                <option>Today</option>
+                                <option>This Week</option>
+                                <option>This Month</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orders Table -->
+                <div class="bg-card rounded-lg border border-border overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-muted">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Order</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Total</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-card divide-y divide-border">
+                                <!-- @MAP: orders.map(order => ( -->
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-foreground" data-mock="true">#ORD-001</div>
+                                        <div class="text-sm text-muted-foreground" data-mock="true">3 items</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-foreground" data-mock="true">John Manufacturing</div>
+                                        <div class="text-sm text-muted-foreground" data-mock="true">john@manufacturing.com</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Dec 15, 2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-mock="true">Shipped</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground" data-mock="true">$2,450.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:viewOrder">View</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:updateStatus">Update</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-foreground" data-mock="true">#ORD-002</div>
+                                        <div class="text-sm text-muted-foreground" data-mock="true">5 items</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-foreground" data-mock="true">Tech Solutions Ltd</div>
+                                        <div class="text-sm text-muted-foreground" data-mock="true">orders@techsolutions.com</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Dec 14, 2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" data-mock="true">Pending</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground" data-mock="true">$1,890.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:viewOrder">View</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:updateStatus">Update</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-muted/50">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-foreground" data-mock="true">#ORD-003</div>
+                                        <div class="text-sm text-muted-foreground" data-mock="true">2 items</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-foreground" data-mock="true">AutoParts Direct</div>
+                                        <div class="text-sm text-muted-foreground" data-mock="true">sales@autopartsdirect.com</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground" data-mock="true">Dec 13, 2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" data-mock="true">Processing</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground" data-mock="true">$975.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-primary hover:text-primary/80 mr-3" data-event="click:viewOrder">View</button>
+                                        <button class="text-primary hover:text-primary/80" data-event="click:updateStatus">Update</button>
+                                    </td>
+                                </tr>
+                                <!-- @END_MAP )) -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <div class="px-6 py-4 border-t border-border">
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-muted-foreground" data-mock="true">
+                                Showing 1 to 3 of 89 orders
+                            </div>
+                            <div class="flex space-x-2">
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">Previous</button>
+                                <button class="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md">1</button>
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">2</button>
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">3</button>
+                                <button class="px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: OrdersView -->
+
+            <!-- Warehouses Section -->
+            <!-- @COMPONENT: WarehousesView -->
+            <div id="warehouses-section" class="section-content hidden p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-foreground">Warehouses</h2>
+                        <p class="text-muted-foreground">Manage warehouse locations and stock distribution</p>
+                    </div>
+                    <button class="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors" data-event="click:openAddWarehouseModal">
+                        Add Warehouse
+                    </button>
+                </div>
+
+                <!-- Warehouses Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- @MAP: warehouses.map(warehouse => ( -->
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-foreground" data-mock="true">Warehouse A</h3>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-mock="true">Active</span>
+                        </div>
+                        
+                        <div class="space-y-3 mb-4">
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">New York, NY</span>
+                            </div>
+                            
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">425 Products</span>
+                            </div>
+                            
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">12 Aisles, 180 Racks</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button class="flex-1 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors" data-event="click:viewWarehouse">
+                                View Details
+                            </button>
+                            <button class="px-3 py-2 text-sm border border-border rounded-md hover:bg-accent transition-colors" data-event="click:editWarehouse">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-foreground" data-mock="true">Warehouse B</h3>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-mock="true">Active</span>
+                        </div>
+                        
+                        <div class="space-y-3 mb-4">
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">Los Angeles, CA</span>
+                            </div>
+                            
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">358 Products</span>
+                            </div>
+                            
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">10 Aisles, 150 Racks</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button class="flex-1 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors" data-event="click:viewWarehouse">
+                                View Details
+                            </button>
+                            <button class="px-3 py-2 text-sm border border-border rounded-md hover:bg-accent transition-colors" data-event="click:editWarehouse">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-card rounded-lg border border-border p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-foreground" data-mock="true">Warehouse C</h3>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800" data-mock="true">Active</span>
+                        </div>
+                        
+                        <div class="space-y-3 mb-4">
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">Chicago, IL</span>
+                            </div>
+                            
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">289 Products</span>
+                            </div>
+                            
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-muted-foreground mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span class="text-muted-foreground" data-mock="true">8 Aisles, 120 Racks</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button class="flex-1 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors" data-event="click:viewWarehouse">
+                                View Details
+                            </button>
+                            <button class="px-3 py-2 text-sm border border-border rounded-md hover:bg-accent transition-colors" data-event="click:editWarehouse">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+            </div>
+            <!-- @END_COMPONENT: WarehousesView -->
+        </main>
+    </div>
+    <!-- @END_COMPONENT: MainLayout -->
+
+    <!-- Add Product Modal -->
+    <!-- @COMPONENT: AddProductModal -->
+    <div id="add-product-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-card rounded-lg border border-border w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-border">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-foreground">Add New Product</h3>
+                    <button class="text-muted-foreground hover:text-foreground" data-event="click:closeModal">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <form class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Product Name</label>
+                        <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background" placeholder="Enter product name" data-mock="true">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">SKU</label>
+                        <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background" placeholder="Enter SKU" data-mock="true">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-foreground mb-2">Description</label>
+                    <textarea class="w-full px-3 py-2 border border-input rounded-md bg-background" rows="3" placeholder="Product description" data-mock="true"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Category</label>
+                        <select class="w-full px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                            <option>Select category</option>
+                            <option>Brake Parts</option>
+                            <option>Engine Parts</option>
+                            <option>Filters</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Initial Stock</label>
+                        <input type="number" class="w-full px-3 py-2 border border-input rounded-md bg-background" placeholder="0" data-mock="true">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Min Stock Level</label>
+                        <input type="number" class="w-full px-3 py-2 border border-input rounded-md bg-background" placeholder="0" data-mock="true">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Warehouse</label>
+                        <select class="w-full px-3 py-2 border border-input rounded-md bg-background" data-mock="true">
+                            <option>Select warehouse</option>
+                            <option>Warehouse A</option>
+                            <option>Warehouse B</option>
+                            <option>Warehouse C</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Aisle</label>
+                        <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background" placeholder="A1" data-mock="true">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Rack-Box</label>
+                        <input type="text" class="w-full px-3 py-2 border border-input rounded-md bg-background" placeholder="B-12" data-mock="true">
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4 border-t border-border">
+                    <button type="button" class="px-4 py-2 text-sm border border-border rounded-md hover:bg-accent transition-colors" data-event="click:closeModal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors" data-implementation="Should validate form and add product to inventory">
+                        Add Product
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AddProductModal -->
+
+    <script>
+        (function() {
+            // Navigation functionality
+            const navItems = document.querySelectorAll('.nav-item');
+            const sections = document.querySelectorAll('.section-content');
+
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Update active nav item
+                    navItems.forEach(nav => nav.classList.remove('active', 'bg-primary', 'text-primary-foreground'));
+                    navItems.forEach(nav => nav.classList.add('text-muted-foreground', 'hover:bg-accent', 'hover:text-accent-foreground'));
+                    
+                    this.classList.remove('text-muted-foreground', 'hover:bg-accent', 'hover:text-accent-foreground');
+                    this.classList.add('active', 'bg-primary', 'text-primary-foreground');
+                    
+                    // Show corresponding section
+                    const targetSection = this.getAttribute('data-section');
+                    sections.forEach(section => section.classList.add('hidden'));
+                    document.getElementById(targetSection + '-section').classList.remove('hidden');
+                });
+            });
+
+            // Modal functionality
+            const addProductModal = document.getElementById('add-product-modal');
+            const addProductBtn = document.querySelector('[data-event="click:openAddProductModal"]');
+            const closeModalBtns = document.querySelectorAll('[data-event="click:closeModal"]');
+
+            if (addProductBtn) {
+                addProductBtn.addEventListener('click', function() {
+                    addProductModal.classList.remove('hidden');
+                });
+            }
+
+            closeModalBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    addProductModal.classList.add('hidden');
+                });
+            });
+
+            // Close modal on backdrop click
+            addProductModal.addEventListener('click', function(e) {
+                if (e.target === addProductModal) {
+                    addProductModal.classList.add('hidden');
+                }
+            });
+
+            // TODO: Implement business logic for:
+            // - Product CRUD operations
+            // - Order management
+            // - Stock adjustments
+            // - Warehouse management
+            // - Search and filtering
+            // - Data persistence
+            // - API integrations
+            // - WhatsApp integration
+            // - Real-time updates
+            // - Export functionality
+        })();
+    </script>
+</body>
+</html>

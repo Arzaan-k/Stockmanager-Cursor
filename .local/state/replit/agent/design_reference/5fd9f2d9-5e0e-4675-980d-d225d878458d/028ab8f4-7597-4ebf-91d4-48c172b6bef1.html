@@ -1,0 +1,1530 @@
+<html lang="en" class="h-full bg-background">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Inventory Management - Shopify-style Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/heroicons/2.0.16/heroicons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                },
+                fontFamily: {
+                    sans: ["Inter", "var(--font-sans)"],
+                }
+            },
+        }
+    };
+    </script>
+    <style>
+    :root {
+        --background: hsl(0 0% 100%);
+        --foreground: hsl(222.2 84% 4.9%);
+        --card: hsl(0 0% 100%);
+        --card-foreground: hsl(222.2 84% 4.9%);
+        --popover: hsl(0 0% 100%);
+        --popover-foreground: hsl(222.2 84% 4.9%);
+        --primary: hsl(142.1 76.2% 36.3%);
+        --primary-foreground: hsl(355.7 100% 97.3%);
+        --secondary: hsl(210 40% 98%);
+        --secondary-foreground: hsl(222.2 84% 4.9%);
+        --muted: hsl(210 40% 96%);
+        --muted-foreground: hsl(215.4 16.3% 46.9%);
+        --accent: hsl(210 40% 96%);
+        --accent-foreground: hsl(222.2 84% 4.9%);
+        --destructive: hsl(0 84.2% 60.2%);
+        --destructive-foreground: hsl(210 40% 98%);
+        --border: hsl(214.3 31.8% 91.4%);
+        --input: hsl(214.3 31.8% 91.4%);
+        --ring: hsl(142.1 76.2% 36.3%);
+        --radius: 0.5rem;
+    }
+
+    .dark {
+        --background: hsl(222.2 84% 4.9%);
+        --foreground: hsl(210 40% 98%);
+        --card: hsl(222.2 84% 4.9%);
+        --card-foreground: hsl(210 40% 98%);
+        --popover: hsl(222.2 84% 4.9%);
+        --popover-foreground: hsl(210 40% 98%);
+        --primary: hsl(142.1 70.6% 45.3%);
+        --primary-foreground: hsl(144.9 80.4% 10%);
+        --secondary: hsl(217.2 32.6% 17.5%);
+        --secondary-foreground: hsl(210 40% 98%);
+        --muted: hsl(217.2 32.6% 17.5%);
+        --muted-foreground: hsl(215 20.2% 65.1%);
+        --accent: hsl(217.2 32.6% 17.5%);
+        --accent-foreground: hsl(210 40% 98%);
+        --destructive: hsl(0 62.8% 30.6%);
+        --destructive-foreground: hsl(210 40% 98%);
+        --border: hsl(217.2 32.6% 17.5%);
+        --input: hsl(217.2 32.6% 17.5%);
+        --ring: hsl(142.1 70.6% 45.3%);
+    }
+
+    * {
+        border-color: hsl(var(--border));
+    }
+
+    body {
+        background-color: hsl(var(--background));
+        color: hsl(var(--foreground));
+        font-family: "Inter", sans-serif;
+    }
+
+    .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: .5;
+        }
+    }
+
+    .sidebar-transition {
+        transition: transform 0.3s ease-in-out;
+    }
+
+    @media (max-width: 768px) {
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+    }
+    </style>
+</head>
+<body class="h-full">
+    <div id="app" class="min-h-screen bg-background">
+        <!-- @COMPONENT: AppLayout [main layout with sidebar and content area] -->
+        
+        <!-- Mobile menu button -->
+        <div class="md:hidden fixed top-4 left-4 z-50">
+            <button onclick="toggleMobileSidebar()" class="bg-card text-foreground p-2 rounded-md border border-border shadow-sm">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar-transition fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border md:translate-x-0 sidebar-hidden md:sidebar-visible">
+            <!-- @COMPONENT: Sidebar [navigation menu] -->
+            <div class="flex flex-col h-full">
+                <div class="flex items-center justify-between p-6 border-b border-border">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-lg font-semibold text-foreground">StockSmart</span>
+                    </div>
+                    <button onclick="toggleMobileSidebar()" class="md:hidden p-1 rounded text-muted-foreground hover:text-foreground">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <nav class="flex-1 p-4 space-y-2">
+                    <a href="#dashboard" onclick="showSection('dashboard')" class="nav-item active flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
+
+                    <a href="#products" onclick="showSection('products')" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                        <span>Products</span>
+                    </a>
+
+                    <a href="#catalog" onclick="showSection('catalog')" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                        </svg>
+                        <span>Product Catalog</span>
+                    </a>
+
+                    <a href="#orders" onclick="showSection('orders')" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Orders</span>
+                    </a>
+
+                    <a href="#warehouses" onclick="showSection('warehouses')" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <span>Warehouses</span>
+                    </a>
+
+                    <a href="#whatsapp" onclick="showSection('whatsapp')" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        <span>WhatsApp AI</span>
+                    </a>
+
+                    <a href="#analytics" onclick="showSection('analytics')" class="nav-item flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <span>Analytics</span>
+                    </a>
+                </nav>
+
+                <div class="p-4 border-t border-border">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                            <span class="text-sm font-medium text-muted-foreground" data-bind="user.initials">JD</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-foreground truncate" data-bind="user.name">John Doe</p>
+                            <p class="text-xs text-muted-foreground truncate" data-bind="user.role">Admin</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: Sidebar -->
+
+        <!-- Main Content -->
+        <div class="md:pl-64">
+            <!-- @COMPONENT: TopHeader [page header with actions] -->
+            <header class="bg-card border-b border-border px-4 py-3 md:px-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 id="page-title" class="text-2xl font-semibold text-foreground">Dashboard</h1>
+                        <p id="page-subtitle" class="text-sm text-muted-foreground mt-1">Monitor your inventory and orders</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <!-- Shopping Cart Badge -->
+                        <div class="relative">
+                            <button onclick="showSection('cart')" class="p-2 rounded-md border border-border hover:bg-accent text-muted-foreground hover:text-foreground">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m-2.4 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0h8.5M9.5 18a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0z"></path>
+                                </svg>
+                                <span class="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center" data-bind="cart.itemCount">3</span>
+                            </button>
+                        </div>
+                        <button class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90">
+                            Create Order
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <!-- @END_COMPONENT: TopHeader -->
+
+            <main class="p-4 md:p-6 space-y-6">
+                <!-- Dashboard Section -->
+                <div id="dashboard-section" class="section">
+                    <!-- @COMPONENT: Dashboard [overview metrics and widgets] -->
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">Total Products</p>
+                                    <p class="text-3xl font-bold text-foreground" data-bind="stats.totalProducts">2,847</p>
+                                </div>
+                                <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-2">+12% from last month</p>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">Active Orders</p>
+                                    <p class="text-3xl font-bold text-foreground" data-bind="stats.activeOrders">156</p>
+                                </div>
+                                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-2">+5% from last month</p>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">Low Stock Items</p>
+                                    <p class="text-3xl font-bold text-destructive" data-bind="stats.lowStock">23</p>
+                                </div>
+                                <div class="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-2">Needs attention</p>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-muted-foreground">Warehouses</p>
+                                    <p class="text-3xl font-bold text-foreground" data-bind="stats.warehouses">8</p>
+                                </div>
+                                <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-2">Across 4 cities</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity & Quick Actions -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-foreground">Recent Stock Movements</h3>
+                                <button class="text-sm text-primary hover:text-primary/80">View All</button>
+                            </div>
+                            <div class="space-y-4">
+                                <!-- @MAP: stockMovements.map(movement => ( -->
+                                <div class="flex items-center space-x-4 p-3 rounded-lg bg-muted/50" data-mock="true">
+                                    <div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-foreground" data-bind="movement.productName">Engine Oil Filter - Type A</p>
+                                        <p class="text-xs text-muted-foreground" data-bind="movement.details">Added 50 units • Warehouse North • 2 hours ago</p>
+                                    </div>
+                                    <span class="text-sm text-primary font-medium" data-bind="movement.quantity">+50</span>
+                                </div>
+
+                                <div class="flex items-center space-x-4 p-3 rounded-lg bg-muted/50" data-mock="true">
+                                    <div class="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-foreground" data-bind="movement.productName">Brake Pads - Honda Civic</p>
+                                        <p class="text-xs text-muted-foreground" data-bind="movement.details">Used for Order #1247 • Warehouse South • 4 hours ago</p>
+                                    </div>
+                                    <span class="text-sm text-destructive font-medium" data-bind="movement.quantity">-2</span>
+                                </div>
+
+                                <div class="flex items-center space-x-4 p-3 rounded-lg bg-muted/50" data-mock="true">
+                                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-foreground" data-bind="movement.productName">Spark Plugs - Universal</p>
+                                        <p class="text-xs text-muted-foreground" data-bind="movement.details">Transferred 25 units • North to Central • 6 hours ago</p>
+                                    </div>
+                                    <span class="text-sm text-blue-600 font-medium" data-bind="movement.quantity">~25</span>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
+                            <div class="space-y-3">
+                                <button onclick="showSection('products')" class="w-full flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent text-left">
+                                    <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-foreground">Add Product</span>
+                                </button>
+                                
+                                <button onclick="showSection('orders')" class="w-full flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent text-left">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-foreground">Create Order</span>
+                                </button>
+
+                                <button onclick="showSection('whatsapp')" class="w-full flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent text-left">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-foreground">WhatsApp Updates</span>
+                                </button>
+
+                                <button class="w-full flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent text-left">
+                                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                                    </svg>
+                                    <span class="text-sm font-medium text-foreground">Import CSV</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chart and Low Stock Alert -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Stock Usage Trend</h3>
+                            <div class="h-64 bg-muted/20 rounded-lg flex items-center justify-center">
+                                <p class="text-muted-foreground"><!-- Chart implementation needed --></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-card rounded-lg border border-border p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-foreground">Low Stock Alerts</h3>
+                                <span class="bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded-full">23 items</span>
+                            </div>
+                            <div class="space-y-3 max-h-64 overflow-y-auto">
+                                <!-- @MAP: lowStockItems.map(item => ( -->
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-destructive/10 border border-destructive/20" data-mock="true">
+                                    <div>
+                                        <p class="text-sm font-medium text-foreground" data-bind="item.name">Transmission Oil - 5W30</p>
+                                        <p class="text-xs text-muted-foreground" data-bind="item.sku">SKU: TO-5W30-001</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold text-destructive" data-bind="item.stock">5 left</p>
+                                        <p class="text-xs text-muted-foreground">Min: 20</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-destructive/10 border border-destructive/20" data-mock="true">
+                                    <div>
+                                        <p class="text-sm font-medium text-foreground" data-bind="item.name">Air Filter - Toyota</p>
+                                        <p class="text-xs text-muted-foreground" data-bind="item.sku">SKU: AF-TOY-002</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold text-destructive" data-bind="item.stock">12 left</p>
+                                        <p class="text-xs text-muted-foreground">Min: 25</p>
+                                    </div>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: Dashboard -->
+                </div>
+
+                <!-- Products Section -->
+                <div id="products-section" class="section hidden">
+                    <!-- @COMPONENT: ProductsManagement [CRUD operations for products] -->
+                    <div class="bg-card rounded-lg border border-border">
+                        <div class="flex items-center justify-between p-6 border-b border-border">
+                            <div>
+                                <h2 class="text-xl font-semibold text-foreground">Products</h2>
+                                <p class="text-sm text-muted-foreground mt-1">Manage your inventory and stock levels</p>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <button class="px-4 py-2 border border-border rounded-md text-sm font-medium text-foreground hover:bg-accent">
+                                    Import CSV
+                                </button>
+                                <button class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90">
+                                    Add Product
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filters -->
+                        <div class="p-6 border-b border-border bg-muted/20">
+                            <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
+                                <div class="flex-1">
+                                    <input type="text" placeholder="Search products..." class="w-full px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                </div>
+                                <select class="px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                    <option>All Categories</option>
+                                    <option data-mock="true">Engine Parts</option>
+                                    <option data-mock="true">Brake System</option>
+                                    <option data-mock="true">Electrical</option>
+                                </select>
+                                <select class="px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                    <option>All Warehouses</option>
+                                    <option data-mock="true">Warehouse North</option>
+                                    <option data-mock="true">Warehouse South</option>
+                                    <option data-mock="true">Warehouse Central</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Products Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-muted/30">
+                                    <tr>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Product</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">SKU</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Stock</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Location</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    <!-- @MAP: products.map(product => ( -->
+                                    <tr class="hover:bg-muted/50" data-mock="true">
+                                        <td class="p-4">
+                                            <div class="flex items-center space-x-3">
+                                                <!-- Product image placeholder -->
+                                                <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                                    <svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <p class="font-medium text-foreground" data-bind="product.name">Engine Oil Filter - Type A</p>
+                                                    <p class="text-sm text-muted-foreground" data-bind="product.type">Engine Parts</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-sm text-foreground" data-bind="product.sku">ENG-OIL-001</td>
+                                        <td class="p-4">
+                                            <div class="text-sm">
+                                                <p class="font-medium text-foreground" data-bind="product.totalStock">Total: 150</p>
+                                                <p class="text-muted-foreground" data-bind="product.usedStock">Used: 125 • Available: 25</p>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-sm text-muted-foreground" data-bind="product.location">North-A1-R3-B12</td>
+                                        <td class="p-4">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                                In Stock
+                                            </span>
+                                        </td>
+                                        <td class="p-4">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="p-1 text-muted-foreground hover:text-foreground">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="p-1 text-muted-foreground hover:text-destructive">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="hover:bg-muted/50" data-mock="true">
+                                        <td class="p-4">
+                                            <div class="flex items-center space-x-3">
+                                                <div class="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                                                    <svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <p class="font-medium text-foreground" data-bind="product.name">Brake Pads - Honda Civic</p>
+                                                    <p class="text-sm text-muted-foreground" data-bind="product.type">Brake System</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-sm text-foreground" data-bind="product.sku">BRK-HND-002</td>
+                                        <td class="p-4">
+                                            <div class="text-sm">
+                                                <p class="font-medium text-foreground" data-bind="product.totalStock">Total: 45</p>
+                                                <p class="text-muted-foreground" data-bind="product.usedStock">Used: 33 • Available: 12</p>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-sm text-muted-foreground" data-bind="product.location">South-B2-R1-B8</td>
+                                        <td class="p-4">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                Low Stock
+                                            </span>
+                                        </td>
+                                        <td class="p-4">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="p-1 text-muted-foreground hover:text-foreground">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="p-1 text-muted-foreground hover:text-destructive">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: ProductsManagement -->
+                </div>
+
+                <!-- Product Catalog Section -->
+                <div id="catalog-section" class="section hidden">
+                    <!-- @COMPONENT: ProductCatalog [customer-facing e-commerce style catalog] -->
+                    <div class="mb-6">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                            <div>
+                                <h2 class="text-2xl font-bold text-foreground">Product Catalog</h2>
+                                <p class="text-muted-foreground mt-1">Browse and order spare parts from our inventory</p>
+                            </div>
+                            <div class="flex items-center space-x-3 mt-4 md:mt-0">
+                                <div class="flex items-center space-x-2 bg-muted rounded-lg p-1">
+                                    <button onclick="setViewMode('grid')" class="view-toggle active px-3 py-1 text-sm rounded-md bg-background text-foreground shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                                        </svg>
+                                    </button>
+                                    <button onclick="setViewMode('list')" class="view-toggle px-3 py-1 text-sm rounded-md text-muted-foreground hover:text-foreground">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filters Bar -->
+                        <div class="flex flex-wrap items-center gap-4 mb-6 p-4 bg-muted/20 rounded-lg">
+                            <select class="px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                                <option>All Categories</option>
+                                <option data-mock="true">Engine Parts</option>
+                                <option data-mock="true">Brake System</option>
+                                <option data-mock="true">Electrical</option>
+                                <option data-mock="true">Suspension</option>
+                            </select>
+                            <select class="px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                                <option>Price Range</option>
+                                <option data-mock="true">$0 - $50</option>
+                                <option data-mock="true">$50 - $200</option>
+                                <option data-mock="true">$200+</option>
+                            </select>
+                            <select class="px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                                <option>Availability</option>
+                                <option data-mock="true">In Stock</option>
+                                <option data-mock="true">Low Stock</option>
+                                <option data-mock="true">Out of Stock</option>
+                            </select>
+                            <input type="text" placeholder="Search products..." class="flex-1 min-w-0 px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                        </div>
+
+                        <!-- Product Grid -->
+                        <div id="product-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+                            <!-- @MAP: catalogProducts.map(product => ( -->
+                            <div class="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow" data-mock="true">
+                                <!-- Auto parts product image -->
+                                <img src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=240" alt="Car engine oil filter" class="w-full h-48 object-cover">
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <h3 class="font-semibold text-foreground text-sm" data-bind="product.name">Engine Oil Filter - Premium</h3>
+                                        <span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">In Stock</span>
+                                    </div>
+                                    <p class="text-xs text-muted-foreground mb-3" data-bind="product.sku">SKU: ENG-OIL-001</p>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-lg font-bold text-foreground" data-bind="product.price">$24.99</span>
+                                        <span class="text-sm text-muted-foreground" data-bind="product.stock">25 available</span>
+                                    </div>
+                                    <button onclick="addToCart('ENG-OIL-001')" class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                                        Add to Cart
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow" data-mock="true">
+                                <!-- Car brake pads image -->
+                                <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=240" alt="Car brake pads and components" class="w-full h-48 object-cover">
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <h3 class="font-semibold text-foreground text-sm" data-bind="product.name">Brake Pads - Honda Civic</h3>
+                                        <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Low Stock</span>
+                                    </div>
+                                    <p class="text-xs text-muted-foreground mb-3" data-bind="product.sku">SKU: BRK-HND-002</p>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-lg font-bold text-foreground" data-bind="product.price">$89.99</span>
+                                        <span class="text-sm text-muted-foreground" data-bind="product.stock">12 available</span>
+                                    </div>
+                                    <button onclick="addToCart('BRK-HND-002')" class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                                        Add to Cart
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow" data-mock="true">
+                                <!-- Car air filter image -->
+                                <img src="https://pixabay.com/get/geb3389f2f82a021b5ec6f2619657f0f8cffb01fa9b4b229b8e9b2aaab8e2c9484ff30e6af5f7e32ea4701b8351681319d4459d43174f235d222de64c6bb9b603_1280.jpg" alt="Car air filter component" class="w-full h-48 object-cover">
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <h3 class="font-semibold text-foreground text-sm" data-bind="product.name">Air Filter - Universal</h3>
+                                        <span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">In Stock</span>
+                                    </div>
+                                    <p class="text-xs text-muted-foreground mb-3" data-bind="product.sku">SKU: AIR-UNI-003</p>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-lg font-bold text-foreground" data-bind="product.price">$15.49</span>
+                                        <span class="text-sm text-muted-foreground" data-bind="product.stock">78 available</span>
+                                    </div>
+                                    <button onclick="addToCart('AIR-UNI-003')" class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                                        Add to Cart
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow" data-mock="true">
+                                <!-- Car spark plugs image -->
+                                <img src="https://images.unsplash.com/photo-1609521263047-f8f205293f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=240" alt="Car spark plugs set" class="w-full h-48 object-cover">
+                                <div class="p-4">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <h3 class="font-semibold text-foreground text-sm" data-bind="product.name">Spark Plugs Set - Toyota</h3>
+                                        <span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">In Stock</span>
+                                    </div>
+                                    <p class="text-xs text-muted-foreground mb-3" data-bind="product.sku">SKU: SPK-TOY-004</p>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-lg font-bold text-foreground" data-bind="product.price">$34.99</span>
+                                        <span class="text-sm text-muted-foreground" data-bind="product.stock">42 available</span>
+                                    </div>
+                                    <button onclick="addToCart('SPK-TOY-004')" class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                                        Add to Cart
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: ProductCatalog -->
+                </div>
+
+                <!-- Shopping Cart Section -->
+                <div id="cart-section" class="section hidden">
+                    <!-- @COMPONENT: ShoppingCart [cart management and checkout] -->
+                    <div class="max-w-4xl mx-auto">
+                        <div class="bg-card rounded-lg border border-border">
+                            <div class="p-6 border-b border-border">
+                                <h2 class="text-xl font-semibold text-foreground">Shopping Cart</h2>
+                                <p class="text-sm text-muted-foreground mt-1">Review your items before checkout</p>
+                            </div>
+
+                            <div class="p-6">
+                                <div class="space-y-6">
+                                    <!-- @MAP: cartItems.map(item => ( -->
+                                    <div class="flex items-center space-x-4 p-4 border border-border rounded-lg" data-mock="true">
+                                        <!-- Car part image -->
+                                        <img src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80" alt="Engine oil filter" class="w-16 h-16 rounded-lg object-cover">
+                                        <div class="flex-1">
+                                            <h3 class="font-medium text-foreground" data-bind="item.name">Engine Oil Filter - Premium</h3>
+                                            <p class="text-sm text-muted-foreground" data-bind="item.sku">SKU: ENG-OIL-001</p>
+                                            <p class="text-lg font-semibold text-foreground mt-1" data-bind="item.price">$24.99</p>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="flex items-center border border-border rounded-lg">
+                                                <button onclick="updateQuantity('ENG-OIL-001', -1)" class="p-2 hover:bg-muted">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                                    </svg>
+                                                </button>
+                                                <span class="px-4 py-2 text-sm font-medium text-foreground" data-bind="item.quantity">2</span>
+                                                <button onclick="updateQuantity('ENG-OIL-001', 1)" class="p-2 hover:bg-muted">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <button onclick="removeFromCart('ENG-OIL-001')" class="p-2 text-destructive hover:bg-destructive/10 rounded-lg">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center space-x-4 p-4 border border-border rounded-lg" data-mock="true">
+                                        <!-- Car brake pads image -->
+                                        <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80" alt="Brake pads set" class="w-16 h-16 rounded-lg object-cover">
+                                        <div class="flex-1">
+                                            <h3 class="font-medium text-foreground" data-bind="item.name">Brake Pads - Honda Civic</h3>
+                                            <p class="text-sm text-muted-foreground" data-bind="item.sku">SKU: BRK-HND-002</p>
+                                            <p class="text-lg font-semibold text-foreground mt-1" data-bind="item.price">$89.99</p>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            <div class="flex items-center border border-border rounded-lg">
+                                                <button onclick="updateQuantity('BRK-HND-002', -1)" class="p-2 hover:bg-muted">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                                                    </svg>
+                                                </button>
+                                                <span class="px-4 py-2 text-sm font-medium text-foreground" data-bind="item.quantity">1</span>
+                                                <button onclick="updateQuantity('BRK-HND-002', 1)" class="p-2 hover:bg-muted">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <button onclick="removeFromCart('BRK-HND-002')" class="p-2 text-destructive hover:bg-destructive/10 rounded-lg">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+
+                                <!-- Cart Summary -->
+                                <div class="mt-8 border-t border-border pt-6">
+                                    <div class="bg-muted/20 rounded-lg p-6">
+                                        <h3 class="font-semibold text-foreground mb-4">Order Summary</h3>
+                                        <div class="space-y-2 text-sm">
+                                            <div class="flex justify-between">
+                                                <span class="text-muted-foreground">Subtotal</span>
+                                                <span class="text-foreground" data-bind="cart.subtotal">$139.97</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-muted-foreground">Tax</span>
+                                                <span class="text-foreground" data-bind="cart.tax">$11.20</span>
+                                            </div>
+                                            <div class="flex justify-between font-semibold text-base pt-2 border-t border-border">
+                                                <span class="text-foreground">Total</span>
+                                                <span class="text-foreground" data-bind="cart.total">$151.17</span>
+                                            </div>
+                                        </div>
+                                        <button onclick="proceedToCheckout()" class="w-full mt-6 bg-primary text-primary-foreground py-3 px-4 rounded-md font-medium hover:bg-primary/90 transition-colors">
+                                            Proceed to Checkout
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: ShoppingCart -->
+                </div>
+
+                <!-- Orders Section -->
+                <div id="orders-section" class="section hidden">
+                    <!-- @COMPONENT: OrdersManagement [order tracking and management] -->
+                    <div class="bg-card rounded-lg border border-border">
+                        <div class="flex items-center justify-between p-6 border-b border-border">
+                            <div>
+                                <h2 class="text-xl font-semibold text-foreground">Orders</h2>
+                                <p class="text-sm text-muted-foreground mt-1">Track and manage customer orders</p>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <select class="px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                                    <option>All Statuses</option>
+                                    <option data-mock="true">Pending</option>
+                                    <option data-mock="true">Shipped</option>
+                                    <option data-mock="true">Delivered</option>
+                                    <option data-mock="true">Cancelled</option>
+                                </select>
+                                <button onclick="showSection('catalog')" class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90">
+                                    Create Order
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-muted/30">
+                                    <tr>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Order #</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Customer</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Items</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Total</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
+                                        <th class="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-border">
+                                    <!-- @MAP: orders.map(order => ( -->
+                                    <tr class="hover:bg-muted/50" data-mock="true">
+                                        <td class="p-4 font-medium text-foreground" data-bind="order.id">#1247</td>
+                                        <td class="p-4">
+                                            <div>
+                                                <p class="font-medium text-foreground" data-bind="order.customerName">Sarah Johnson</p>
+                                                <p class="text-sm text-muted-foreground" data-bind="order.customerEmail">sarah.j@email.com</p>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-sm text-foreground" data-bind="order.itemCount">3 items</td>
+                                        <td class="p-4 font-medium text-foreground" data-bind="order.total">$267.45</td>
+                                        <td class="p-4">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                Shipped
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-sm text-muted-foreground" data-bind="order.date">Dec 15, 2023</td>
+                                        <td class="p-4">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="p-1 text-muted-foreground hover:text-foreground">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="p-1 text-muted-foreground hover:text-foreground">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="hover:bg-muted/50" data-mock="true">
+                                        <td class="p-4 font-medium text-foreground" data-bind="order.id">#1246</td>
+                                        <td class="p-4">
+                                            <div>
+                                                <p class="font-medium text-foreground" data-bind="order.customerName">Mike Rodriguez</p>
+                                                <p class="text-sm text-muted-foreground" data-bind="order.customerEmail">mike.r@email.com</p>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-sm text-foreground" data-bind="order.itemCount">1 item</td>
+                                        <td class="p-4 font-medium text-foreground" data-bind="order.total">$89.99</td>
+                                        <td class="p-4">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                Pending
+                                            </span>
+                                        </td>
+                                        <td class="p-4 text-sm text-muted-foreground" data-bind="order.date">Dec 14, 2023</td>
+                                        <td class="p-4">
+                                            <div class="flex items-center space-x-2">
+                                                <button class="p-1 text-muted-foreground hover:text-foreground">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="p-1 text-muted-foreground hover:text-foreground">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- @END_MAP )) -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: OrdersManagement -->
+                </div>
+
+                <!-- Warehouses Section -->
+                <div id="warehouses-section" class="section hidden">
+                    <!-- @COMPONENT: WarehouseManagement [warehouse mapping and stock distribution] -->
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold text-foreground">Warehouses</h2>
+                                <p class="text-muted-foreground mt-1">Manage warehouse locations and stock distribution</p>
+                            </div>
+                            <button class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90">
+                                Add Warehouse
+                            </button>
+                        </div>
+
+                        <!-- Warehouse Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <!-- @MAP: warehouses.map(warehouse => ( -->
+                            <div class="bg-card border border-border rounded-lg p-6" data-mock="true">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="font-semibold text-foreground" data-bind="warehouse.name">Warehouse North</h3>
+                                    <span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">Active</span>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <p class="text-muted-foreground" data-bind="warehouse.location">Seattle, WA</p>
+                                    <p class="text-muted-foreground" data-bind="warehouse.address">1245 Industrial Way</p>
+                                    <div class="flex items-center justify-between pt-3 border-t border-border">
+                                        <span class="text-muted-foreground">Total Products</span>
+                                        <span class="font-medium text-foreground" data-bind="warehouse.productCount">847</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-muted-foreground">Stock Value</span>
+                                        <span class="font-medium text-foreground" data-bind="warehouse.stockValue">$127,450</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-border">
+                                    <button onclick="viewWarehouseDetails('north')" class="w-full text-sm text-primary hover:text-primary/80 font-medium">
+                                        View Details →
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg p-6" data-mock="true">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="font-semibold text-foreground" data-bind="warehouse.name">Warehouse South</h3>
+                                    <span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">Active</span>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <p class="text-muted-foreground" data-bind="warehouse.location">Los Angeles, CA</p>
+                                    <p class="text-muted-foreground" data-bind="warehouse.address">3421 Commerce Blvd</p>
+                                    <div class="flex items-center justify-between pt-3 border-t border-border">
+                                        <span class="text-muted-foreground">Total Products</span>
+                                        <span class="font-medium text-foreground" data-bind="warehouse.productCount">1,203</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-muted-foreground">Stock Value</span>
+                                        <span class="font-medium text-foreground" data-bind="warehouse.stockValue">$189,320</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-border">
+                                    <button onclick="viewWarehouseDetails('south')" class="w-full text-sm text-primary hover:text-primary/80 font-medium">
+                                        View Details →
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg p-6" data-mock="true">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="font-semibold text-foreground" data-bind="warehouse.name">Warehouse Central</h3>
+                                    <span class="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full">Active</span>
+                                </div>
+                                <div class="space-y-2 text-sm">
+                                    <p class="text-muted-foreground" data-bind="warehouse.location">Denver, CO</p>
+                                    <p class="text-muted-foreground" data-bind="warehouse.address">789 Distribution Ave</p>
+                                    <div class="flex items-center justify-between pt-3 border-t border-border">
+                                        <span class="text-muted-foreground">Total Products</span>
+                                        <span class="font-medium text-foreground" data-bind="warehouse.productCount">797</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-muted-foreground">Stock Value</span>
+                                        <span class="font-medium text-foreground" data-bind="warehouse.stockValue">$156,890</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 pt-4 border-t border-border">
+                                    <button onclick="viewWarehouseDetails('central')" class="w-full text-sm text-primary hover:text-primary/80 font-medium">
+                                        View Details →
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+
+                        <!-- Warehouse Layout Visualization -->
+                        <div class="mt-8 bg-card border border-border rounded-lg p-6">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Warehouse Layout - North</h3>
+                            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                                <div class="lg:col-span-3">
+                                    <div class="bg-muted/20 rounded-lg p-6 h-64">
+                                        <!-- Warehouse layout grid -->
+                                        <div class="grid grid-cols-6 gap-2 h-full">
+                                            <!-- @MAP: aisles.map(aisle => ( -->
+                                            <div class="bg-background border border-border rounded flex flex-col items-center justify-center text-xs" data-mock="true">
+                                                <span class="font-medium text-foreground" data-bind="aisle.id">A1</span>
+                                                <span class="text-muted-foreground" data-bind="aisle.itemCount">24 items</span>
+                                            </div>
+                                            <div class="bg-background border border-border rounded flex flex-col items-center justify-center text-xs" data-mock="true">
+                                                <span class="font-medium text-foreground" data-bind="aisle.id">A2</span>
+                                                <span class="text-muted-foreground" data-bind="aisle.itemCount">18 items</span>
+                                            </div>
+                                            <div class="bg-background border border-border rounded flex flex-col items-center justify-center text-xs" data-mock="true">
+                                                <span class="font-medium text-foreground" data-bind="aisle.id">B1</span>
+                                                <span class="text-muted-foreground" data-bind="aisle.itemCount">31 items</span>
+                                            </div>
+                                            <div class="bg-background border border-border rounded flex flex-col items-center justify-center text-xs" data-mock="true">
+                                                <span class="font-medium text-foreground" data-bind="aisle.id">B2</span>
+                                                <span class="text-muted-foreground" data-bind="aisle.itemCount">15 items</span>
+                                            </div>
+                                            <div class="bg-background border border-border rounded flex flex-col items-center justify-center text-xs" data-mock="true">
+                                                <span class="font-medium text-foreground" data-bind="aisle.id">C1</span>
+                                                <span class="text-muted-foreground" data-bind="aisle.itemCount">22 items</span>
+                                            </div>
+                                            <div class="bg-background border border-border rounded flex flex-col items-center justify-center text-xs" data-mock="true">
+                                                <span class="font-medium text-foreground" data-bind="aisle.id">C2</span>
+                                                <span class="text-muted-foreground" data-bind="aisle.itemCount">28 items</span>
+                                            </div>
+                                            <!-- @END_MAP )) -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="bg-muted/20 rounded-lg p-4">
+                                        <h4 class="font-medium text-foreground mb-2">Legend</h4>
+                                        <div class="space-y-2 text-xs">
+                                            <div class="flex items-center space-x-2">
+                                                <div class="w-3 h-3 bg-primary rounded"></div>
+                                                <span class="text-muted-foreground">High Stock</span>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <div class="w-3 h-3 bg-yellow-500 rounded"></div>
+                                                <span class="text-muted-foreground">Medium Stock</span>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <div class="w-3 h-3 bg-destructive rounded"></div>
+                                                <span class="text-muted-foreground">Low Stock</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: WarehouseManagement -->
+                </div>
+
+                <!-- WhatsApp AI Section -->
+                <div id="whatsapp-section" class="section hidden">
+                    <!-- @COMPONENT: WhatsAppIntegration [AI-powered WhatsApp interactions] -->
+                    <div class="max-w-4xl mx-auto">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Chat Interface -->
+                            <div class="bg-card border border-border rounded-lg">
+                                <div class="p-4 border-b border-border bg-green-50">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.403"></path>
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-semibold text-foreground">WhatsApp AI Assistant</h3>
+                                            <p class="text-sm text-muted-foreground">Inventory updates via photo recognition</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="h-96 p-4 space-y-4 overflow-y-auto">
+                                    <!-- @MAP: whatsappMessages.map(message => ( -->
+                                    <div class="flex items-start space-x-3" data-mock="true">
+                                        <div class="w-8 h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                                            <span class="text-xs font-medium text-muted-foreground" data-bind="message.userInitials">JD</span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <div class="bg-muted rounded-lg p-3">
+                                                <p class="text-sm text-foreground" data-bind="message.text">I just received 50 units of brake pads</p>
+                                                <!-- Received photo of brake pads -->
+                                                <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=120" alt="Brake pads photo received via WhatsApp" class="mt-2 rounded-lg max-w-48 h-auto">
+                                            </div>
+                                            <p class="text-xs text-muted-foreground mt-1" data-bind="message.timestamp">2 hours ago</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-start space-x-3 justify-end" data-mock="true">
+                                        <div class="flex-1 max-w-xs">
+                                            <div class="bg-primary text-primary-foreground rounded-lg p-3">
+                                                <p class="text-sm" data-bind="message.aiResponse">I detected Honda Civic Brake Pads (SKU: BRK-HND-002). Would you like to:
+                                                1️⃣ Add to inventory
+                                                2️⃣ Mark as used for order</p>
+                                            </div>
+                                            <p class="text-xs text-muted-foreground mt-1 text-right" data-bind="message.timestamp">2 hours ago</p>
+                                        </div>
+                                        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                                            <svg class="w-4 h-4 text-primary-foreground" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+
+                                <div class="p-4 border-t border-border">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="text" placeholder="Type your message..." class="flex-1 px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                                        <button class="p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI Configuration & Stats -->
+                            <div class="space-y-6">
+                                <div class="bg-card border border-border rounded-lg p-6">
+                                    <h3 class="font-semibold text-foreground mb-4">AI Configuration</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-foreground mb-2">WhatsApp Number</label>
+                                            <input type="text" value="+1 (555) 123-4567" class="w-full px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground" data-mock="true">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-foreground mb-2">AI Model</label>
+                                            <select class="w-full px-3 py-2 border border-border rounded-md text-sm bg-background text-foreground">
+                                                <option>CLIP + OCR v2.1</option>
+                                                <option data-mock="true">GPT-4 Vision</option>
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-foreground">Auto-notifications</span>
+                                            <button class="relative inline-flex h-6 w-11 items-center rounded-full bg-primary transition-colors">
+                                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-card border border-border rounded-lg p-6">
+                                    <h3 class="font-semibold text-foreground mb-4">Today's Activity</h3>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-muted-foreground">Images Processed</span>
+                                            <span class="font-medium text-foreground" data-bind="stats.imagesProcessed">47</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-muted-foreground">Stock Updates</span>
+                                            <span class="font-medium text-foreground" data-bind="stats.stockUpdates">23</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-muted-foreground">Orders Created</span>
+                                            <span class="font-medium text-foreground" data-bind="stats.ordersCreated">8</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-muted-foreground">Recognition Accuracy</span>
+                                            <span class="font-medium text-primary" data-bind="stats.accuracy">94.2%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: WhatsAppIntegration -->
+                </div>
+
+                <!-- Analytics Section -->
+                <div id="analytics-section" class="section hidden">
+                    <!-- @COMPONENT: Analytics [comprehensive reporting and insights] -->
+                    <div class="space-y-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-foreground">Analytics & Reports</h2>
+                            <p class="text-muted-foreground mt-1">Insights into your inventory performance and trends</p>
+                        </div>
+
+                        <!-- Key Metrics -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="bg-card border border-border rounded-lg p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-muted-foreground">Monthly Revenue</p>
+                                        <p class="text-2xl font-bold text-foreground" data-bind="analytics.monthlyRevenue">$127,450</p>
+                                    </div>
+                                    <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-primary mt-2">+18% from last month</p>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-muted-foreground">Inventory Turnover</p>
+                                        <p class="text-2xl font-bold text-foreground" data-bind="analytics.turnoverRate">2.4x</p>
+                                    </div>
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-blue-600 mt-2">+0.3x from last month</p>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-muted-foreground">Top Moving Items</p>
+                                        <p class="text-2xl font-bold text-foreground" data-bind="analytics.topMovingCount">47</p>
+                                    </div>
+                                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-purple-600 mt-2">Engine parts leading</p>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm text-muted-foreground">WhatsApp Updates</p>
+                                        <p class="text-2xl font-bold text-foreground" data-bind="analytics.whatsappUpdates">156</p>
+                                    </div>
+                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-green-600 mt-2">This month</p>
+                            </div>
+                        </div>
+
+                        <!-- Charts -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-card border border-border rounded-lg p-6">
+                                <h3 class="font-semibold text-foreground mb-4">Stock Movement Trends</h3>
+                                <div class="h-64 bg-muted/20 rounded-lg flex items-center justify-center">
+                                    <p class="text-muted-foreground"><!-- Chart.js implementation needed --></p>
+                                </div>
+                            </div>
+
+                            <div class="bg-card border border-border rounded-lg p-6">
+                                <h3 class="font-semibold text-foreground mb-4">Warehouse Distribution</h3>
+                                <div class="h-64 bg-muted/20 rounded-lg flex items-center justify-center">
+                                    <p class="text-muted-foreground"><!-- Pie chart implementation needed --></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top Products Table -->
+                        <div class="bg-card border border-border rounded-lg">
+                            <div class="p-6 border-b border-border">
+                                <h3 class="font-semibold text-foreground">Top Moving Products</h3>
+                                <p class="text-sm text-muted-foreground mt-1">Most frequently used items this month</p>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-muted/30">
+                                        <tr>
+                                            <th class="text-left p-4 text-sm font-medium text-muted-foreground">Rank</th>
+                                            <th class="text-left p-4 text-sm font-medium text-muted-foreground">Product</th>
+                                            <th class="text-left p-4 text-sm font-medium text-muted-foreground">Units Moved</th>
+                                            <th class="text-left p-4 text-sm font-medium text-muted-foreground">Revenue</th>
+                                            <th class="text-left p-4 text-sm font-medium text-muted-foreground">Trend</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-border">
+                                        <!-- @MAP: topProducts.map((product, index) => ( -->
+                                        <tr data-mock="true">
+                                            <td class="p-4 text-sm font-medium text-foreground" data-bind="product.rank">1</td>
+                                            <td class="p-4">
+                                                <div class="flex items-center space-x-3">
+                                                    <div class="w-8 h-8 bg-muted rounded-lg flex items-center justify-center">
+                                                        <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-medium text-foreground" data-bind="product.name">Engine Oil Filter - Type A</p>
+                                                        <p class="text-xs text-muted-foreground" data-bind="product.sku">ENG-OIL-001</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="p-4 text-sm text-foreground" data-bind="product.unitsMoved">247</td>
+                                            <td class="p-4 text-sm font-medium text-foreground" data-bind="product.revenue">$6,173</td>
+                                            <td class="p-4">
+                                                <span class="inline-flex items-center text-xs text-primary">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                                    </svg>
+                                                    +12%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <!-- @END_MAP )) -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: Analytics -->
+                </div>
+            </main>
+        </div>
+        <!-- @END_COMPONENT: AppLayout -->
+
+        <!-- Mobile Overlay -->
+        <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden hidden" onclick="toggleMobileSidebar()"></div>
+    </div>
+
+    <script>
+    (function() {
+        // Navigation and UI state management
+        let currentSection = 'dashboard';
+        let cartItems = [
+            { id: 'ENG-OIL-001', name: 'Engine Oil Filter - Premium', price: 24.99, quantity: 2 },
+            { id: 'BRK-HND-002', name: 'Brake Pads - Honda Civic', price: 89.99, quantity: 1 }
+        ];
+
+        // @STATE: sidebarOpen:boolean = false (mobile)
+        // @STATE: currentView:string = 'grid' | 'list'
+        // @STATE: cartItems:array = []
+
+        window.showSection = function(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.add('hidden');
+            });
+
+            // Show selected section
+            const targetSection = document.getElementById(sectionName + '-section');
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+            }
+
+            // Update navigation state
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active', 'bg-primary', 'text-primary-foreground');
+                item.classList.add('text-muted-foreground', 'hover:text-foreground', 'hover:bg-accent');
+            });
+
+            const activeItem = document.querySelector(`a[href="#${sectionName}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active', 'bg-primary', 'text-primary-foreground');
+                activeItem.classList.remove('text-muted-foreground', 'hover:text-foreground', 'hover:bg-accent');
+            }
+
+            // Update page title
+            const titles = {
+                dashboard: { title: 'Dashboard', subtitle: 'Monitor your inventory and orders' },
+                products: { title: 'Products', subtitle: 'Manage your inventory and stock levels' },
+                catalog: { title: 'Product Catalog', subtitle: 'Browse and order spare parts' },
+                cart: { title: 'Shopping Cart', subtitle: 'Review your items before checkout' },
+                orders: { title: 'Orders', subtitle: 'Track and manage customer orders' },
+                warehouses: { title: 'Warehouses', subtitle: 'Manage warehouse locations and stock' },
+                whatsapp: { title: 'WhatsApp AI', subtitle: 'AI-powered inventory updates' },
+                analytics: { title: 'Analytics', subtitle: 'Insights and performance reports' }
+            };
+
+            const pageInfo = titles[sectionName] || titles.dashboard;
+            document.getElementById('page-title').textContent = pageInfo.title;
+            document.getElementById('page-subtitle').textContent = pageInfo.subtitle;
+
+            currentSection = sectionName;
+            
+            // Close mobile sidebar after navigation
+            if (window.innerWidth < 768) {
+                toggleMobileSidebar(false);
+            }
+        };
+
+        window.toggleMobileSidebar = function(forceState) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            
+            if (forceState !== undefined) {
+                // Force specific state
+                if (forceState) {
+                    sidebar.classList.remove('sidebar-hidden');
+                    overlay.classList.remove('hidden');
+                } else {
+                    sidebar.classList.add('sidebar-hidden');
+                    overlay.classList.add('hidden');
+                }
+            } else {
+                // Toggle current state
+                sidebar.classList.toggle('sidebar-hidden');
+                overlay.classList.toggle('hidden');
+            }
+        };
+
+        window.setViewMode = function(mode) {
+            document.querySelectorAll('.view-toggle').forEach(toggle => {
+                toggle.classList.remove('active', 'bg-background', 'text-foreground', 'shadow-sm');
+                toggle.classList.add('text-muted-foreground', 'hover:text-foreground');
+            });
+
+            const activeToggle = document.querySelector(`button[onclick="setViewMode('${mode}')"]`);
+            if (activeToggle) {
+                activeToggle.classList.add('active', 'bg-background', 'text-foreground', 'shadow-sm');
+                activeToggle.classList.remove('text-muted-foreground', 'hover:text-foreground');
+            }
+
+            // TODO: Implement grid/list view switching logic
+        };
+
+        window.addToCart = function(productId) {
+            // TODO: Implement add to cart functionality
+            console.log('Adding product to cart:', productId);
+            
+            // Visual feedback
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Added!';
+            button.classList.add('bg-green-600');
+            
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.classList.remove('bg-green-600');
+            }, 1000);
+        };
+
+        window.updateQuantity = function(productId, change) {
+            // TODO: Implement quantity update logic
+            console.log('Updating quantity for:', productId, 'change:', change);
+        };
+
+        window.removeFromCart = function(productId) {
+            // TODO: Implement remove from cart functionality
+            console.log('Removing from cart:', productId);
+        };
+
+        window.proceedToCheckout = function() {
+            // TODO: Implement checkout flow
+            console.log('Proceeding to checkout');
+        };
+
+        window.viewWarehouseDetails = function(warehouseId) {
+            // TODO: Implement warehouse detail view
+            console.log('Viewing warehouse details:', warehouseId);
+        };
+
+        // PWA Service Worker Registration
+        // @FUNCTIONALITY: PWA service worker should cache static assets and enable offline functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                // TODO: Register service worker for PWA functionality
+                console.log('PWA service worker registration needed');
+            });
+        }
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            showSection('dashboard');
+        });
+    })();
+    </script>
+</body>
+</html>
