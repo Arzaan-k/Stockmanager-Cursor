@@ -36,6 +36,18 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Helper to normalize image URLs stored with localhost into relative paths
+  const normalizeImageUrl = (url?: string | null): string | null => {
+    if (!url) return url ?? null;
+    try {
+      const u = new URL(url);
+      if (u.pathname.startsWith('/uploads/')) return u.pathname;
+      return url;
+    } catch {
+      // Not a URL; if already relative keep as is
+      return url;
+    }
+  };
   // Register vendor routes
   registerVendorRoutes(app);
   
@@ -385,11 +397,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products", async (req, res) => {
     try {
       const { search, category, warehouseId } = req.query;
-      const products = await storage.getProducts({
+      let products = await storage.getProducts({
         search: search as string,
         category: category as string,
         warehouseId: warehouseId as string,
       });
+      // Normalize image urls (strip localhost hostnames)
+      products = products.map(p => ({ ...p, imageUrl: normalizeImageUrl((p as any).imageUrl) as any }));
       res.json(products);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch products" });
@@ -405,7 +419,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn("GET /api/products/:id not found", { id });
         return res.status(404).json({ error: "Product not found" });
       }
-      res.json(product);
+      const normalized: any = { ...product, imageUrl: normalizeImageUrl((product as any).imageUrl) };
+      if ((product as any).photos && Array.isArray((product as any).photos)) {
+        normalized.photos = (product as any).photos.map((ph: any) => {
+          if (typeof ph === 'string') return normalizeImageUrl(ph);
+          if (ph && typeof ph === 'object') return { ...ph, url: normalizeImageUrl(ph.url) };
+          return ph;
+        });
+      }
+      res.json(normalized);
     } catch (error) {
       console.error("GET /api/products/:id error", error);
       res.status(500).json({ error: "Failed to fetch product" });

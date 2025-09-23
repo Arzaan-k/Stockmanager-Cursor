@@ -34,7 +34,8 @@ export class ProductImageManager {
   constructor() {
     // Create images directory if it doesn't exist
     this.imagesDir = path.join(process.cwd(), 'uploads', 'products');
-    this.baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    // Prefer relative URLs so they work in any environment/domain
+    this.baseUrl = process.env.BASE_URL || '';
     this.ensureImagesDirectory();
   }
 
@@ -107,8 +108,15 @@ export class ProductImageManager {
         fs.writeFileSync(filePath, imageBuffer);
       }
 
-      // Create URL for the image
-      const imageUrl = `${this.baseUrl}/uploads/products/${filename}`;
+      // Create URL for the image (relative by default)
+      let imageUrl = `${this.baseUrl}/uploads/products/${filename}`;
+      // If URL contains localhost in DB history, strip host and make relative
+      try {
+        const u = new URL(imageUrl);
+        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+          imageUrl = u.pathname;
+        }
+      } catch {}
 
       // Update product in database
       let photos = [];
