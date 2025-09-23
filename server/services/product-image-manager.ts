@@ -139,8 +139,10 @@ export class ProductImageManager {
 
       await storage.updateProduct(productId, updates);
 
-      // Index the image for recognition
-      await this.indexProductImage(productId, imageUrl);
+      // Index the image for recognition (can be disabled in production)
+      if (process.env.DISABLE_IMAGE_INDEXING !== 'true') {
+        await this.indexProductImage(productId, imageUrl);
+      }
 
       console.log(`Saved product image: ${filename} for product ${productId}`);
       

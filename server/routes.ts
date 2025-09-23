@@ -402,8 +402,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category: category as string,
         warehouseId: warehouseId as string,
       });
-      // Normalize image urls (strip localhost hostnames)
-      products = products.map(p => ({ ...p, imageUrl: normalizeImageUrl((p as any).imageUrl) as any }));
+      // Normalize image urls (strip localhost hostnames) and fallback to first photo
+      products = products.map(p => {
+        const anyP: any = p as any;
+        let imageUrl = normalizeImageUrl(anyP.imageUrl) as string | null;
+        if (!imageUrl && Array.isArray(anyP.photos) && anyP.photos.length > 0) {
+          const first = anyP.photos[0];
+          const firstUrl = typeof first === 'string' ? first : first?.url;
+          imageUrl = normalizeImageUrl(firstUrl) as string | null;
+        }
+        return { ...p, imageUrl } as any;
+      });
       res.json(products);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch products" });
@@ -420,6 +429,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
       const normalized: any = { ...product, imageUrl: normalizeImageUrl((product as any).imageUrl) };
+      if (!normalized.imageUrl && Array.isArray((product as any).photos) && (product as any).photos.length > 0) {
+        const first = (product as any).photos[0];
+        const firstUrl = typeof first === 'string' ? first : first?.url;
+        normalized.imageUrl = normalizeImageUrl(firstUrl);
+      }
       if ((product as any).photos && Array.isArray((product as any).photos)) {
         normalized.photos = (product as any).photos.map((ph: any) => {
           if (typeof ph === 'string') return normalizeImageUrl(ph);
@@ -1207,6 +1221,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve uploaded product images
   app.use('/uploads/products', express.static(path.join(process.cwd(), 'uploads', 'products')));
+  // Also serve static uploads from dist when running from compiled build
+  app.use('/uploads', express.static(path.join(process.cwd(), 'dist', 'uploads')));
 
   const purchasesDir = path.join(process.cwd(), 'uploads', 'purchases');
   if (!fs.existsSync(purchasesDir)) {
