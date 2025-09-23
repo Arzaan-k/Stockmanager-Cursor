@@ -21,7 +21,7 @@ const rolePermissions = {
   permissionId: 'permission_id'
 };
 import { db } from "./db";
-import { purchases } from "../shared/schema";
+import { purchases, poDrafts } from "../shared/schema";
 import { eq, desc, asc, like, and, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -125,6 +125,11 @@ export interface IStorage {
   }): Promise<any>;
   getPurchases(userId?: string): Promise<any[]>;
   updatePurchase(id: string, updates: Partial<any>): Promise<any | null>;
+
+  // PO Drafts
+  getPoDraft(orderId: string): Promise<any | undefined>;
+  upsertPoDraft(orderId: string, draft: { header?: any; items?: any[] }): Promise<any>;
+  deletePoDraft(orderId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -900,6 +905,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(purchases.id, id))
       .returning();
     return updated || null;
+  }
+
+  // ==== PO Drafts ====
+  async getPoDraft(orderId: string): Promise<any | undefined> {
+    const [row] = await db.select().from(poDrafts).where(eq(poDrafts.orderId, orderId));
+    return row || undefined;
+  }
+
+  async upsertPoDraft(orderId: string, draft: { header?: any; items?: any[] }): Promise<any> {
+    const existing = await this.getPoDraft(orderId);
+    if (existing) {
+      const [updated] = await db
+        .update(poDrafts)
+        .set({ header: draft.header as any, items: draft.items as any, updatedAt: new Date() as any })
+        .where(eq(poDrafts.orderId, orderId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert(poDrafts)
+      .values({ orderId, header: draft.header as any, items: draft.items as any })
+      .returning();
+    return created;
+  }
+
+  async deletePoDraft(orderId: string): Promise<void> {
+    await db.delete(poDrafts).where(eq(poDrafts.orderId, orderId));
   }
 }
 

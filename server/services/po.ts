@@ -43,7 +43,10 @@ export async function streamPurchaseOrderPdf(res: Response, orderId: string, opt
   // Try to fetch GRN header (user provided) to fill PO metadata fields
   const { grn } = await storage.getOrderGrn(orderId);
 
-  const items = (order.items || []).map((x: any) => ({
+  // Apply PO Draft overrides if present
+  const poDraft = await storage.getPoDraft(orderId);
+
+  const itemsBase = (order.items || []).map((x: any) => ({
     id: x.orderItem.id,
     productId: x.orderItem.productId,
     name: x.product?.name ?? "",
@@ -55,7 +58,22 @@ export async function streamPurchaseOrderPdf(res: Response, orderId: string, opt
     totalPrice: Number(x.orderItem.totalPrice),
   }));
 
-  const deficits = await computeDeficits(
+  const items = (() => {
+    if (poDraft?.items && Array.isArray(poDraft.items) && poDraft.items.length > 0) {
+      // Use draft items directly if provided
+      return poDraft.items.map((i: any) => ({
+        ...i,
+        quantity: Number(i.quantity ?? i.deficitQty ?? 0),
+        unitPrice: Number(i.unitPrice ?? 0),
+        amount: Number(i.amount ?? (Number(i.unitPrice ?? 0) * Number(i.deficitQty ?? 0)))
+      }));
+    }
+    return itemsBase;
+  })();
+
+  const deficits = poDraft?.items && Array.isArray(poDraft.items) && poDraft.items.length > 0
+    ? poDraft.items.map((i: any) => ({ productId: i.productId, quantity: Number(i.quantity ?? i.deficitQty ?? 0), unitPrice: Number(i.unitPrice ?? 0), deficitQty: Number(i.deficitQty ?? i.quantity ?? 0) }))
+    : await computeDeficits(
     orderId,
     items.map((i: { productId: string; quantity: number; unitPrice: number }) => ({
       productId: i.productId,
@@ -83,8 +101,10 @@ export async function streamPurchaseOrderPdf(res: Response, orderId: string, opt
   );
   const poLines = deficits.map(d => ({
     ...byId[d.productId],
+    // Allow override of unitPrice/amount via draft items
+    unitPrice: byId[d.productId]?.unitPrice ?? d.unitPrice,
     deficitQty: d.deficitQty,
-    amount: d.deficitQty * byId[d.productId].unitPrice,
+    amount: (d.deficitQty) * (byId[d.productId]?.unitPrice ?? d.unitPrice),
   }));
 
   const poSubtotal = poLines.reduce((sum, l) => sum + l.amount, 0);
@@ -133,13 +153,16 @@ export async function streamPurchaseOrderPdf(res: Response, orderId: string, opt
     if (v) doc.fontSize(9).fillColor("#000").text(v, x + 4, y);
   };
 
+  // Merge header overrides
+  const header = poDraft?.header || {};
+
   // Left column labels/values
   let yL = metaTop;
-  label("Vendor Name", leftX, yL); valueBox(grn?.vendorName ?? "", leftX + 95, yL, leftColW - 100);
-  yL += 20; label("Vendor Bill No", leftX, yL); valueBox(grn?.vendorBillNo ?? "", leftX + 95, yL, leftColW - 100);
-  yL += 20; label("Indent No", leftX, yL); valueBox(grn?.indentNo ?? "", leftX + 95, yL, leftColW - 100);
-  yL += 20; label("PO No", leftX, yL); valueBox(grn?.poNo ?? order.orderNumber, leftX + 95, yL, leftColW - 100);
-  yL += 20; label("Challan no", leftX, yL); valueBox(grn?.challanNo ?? "", leftX + 95, yL, leftColW - 100);
+  label("Vendor Name", leftX, yL); valueBox(header.vendorName ?? grn?.vendorName ?? "", leftX + 95, yL, leftColW - 100);
+  yL += 20; label("Vendor Bill No", leftX, yL); valueBox(header.vendorBillNo ?? grn?.vendorBillNo ?? "", leftX + 95, yL, leftColW - 100);
+  yL += 20; label("Indent No", leftX, yL); valueBox(header.indentNo ?? grn?.indentNo ?? "", leftX + 95, yL, leftColW - 100);
+  yL += 20; label("PO No", leftX, yL); valueBox(header.poNo ?? grn?.poNo ?? order.orderNumber, leftX + 95, yL, leftColW - 100);
+  yL += 20; label("Challan no", leftX, yL); valueBox(header.challanNo ?? grn?.challanNo ?? "", leftX + 95, yL, leftColW - 100);
 
   // Right column (dates and job/location) within a light box
   doc.save();
@@ -147,11 +170,11 @@ export async function streamPurchaseOrderPdf(res: Response, orderId: string, opt
   doc.restore();
   let yR = metaTop;
   const dateStr = (d?: Date) => (d ? new Date(d).toLocaleDateString() : "");
-  label("GRN DATE", rightColX + 6, yR); valueBox(dateStr(grn?.grnDate as any), rightColX + 110, yR, rightColW - 118); yR += 20;
-  label("Vendor Bill Date", rightColX + 6, yR); valueBox(dateStr(grn?.vendorBillDate as any), rightColX + 110, yR, rightColW - 118); yR += 20;
-  label("PO Date", rightColX + 6, yR); valueBox(dateStr(grn?.poDate as any) || new Date().toLocaleDateString(), rightColX + 110, yR, rightColW - 118); yR += 20;
-  label("Job Order No.", rightColX + 6, yR); valueBox(grn?.jobOrderNo ?? (order.jobOrder || ""), rightColX + 110, yR, rightColW - 118); yR += 20;
-  label("Location", rightColX + 6, yR); valueBox(grn?.location ?? (order.location || ""), rightColX + 110, yR, rightColW - 118);
+  label("GRN DATE", rightColX + 6, yR); valueBox(dateStr(header.grnDate as any) || dateStr(grn?.grnDate as any), rightColX + 110, yR, rightColW - 118); yR += 20;
+  label("Vendor Bill Date", rightColX + 6, yR); valueBox(dateStr(header.vendorBillDate as any) || dateStr(grn?.vendorBillDate as any), rightColX + 110, yR, rightColW - 118); yR += 20;
+  label("PO Date", rightColX + 6, yR); valueBox(dateStr(header.poDate as any) || dateStr(grn?.poDate as any) || new Date().toLocaleDateString(), rightColX + 110, yR, rightColW - 118); yR += 20;
+  label("Job Order No.", rightColX + 6, yR); valueBox(header.jobOrderNo ?? grn?.jobOrderNo ?? (order.jobOrder || ""), rightColX + 110, yR, rightColW - 118); yR += 20;
+  label("Location", rightColX + 6, yR); valueBox(header.location ?? grn?.location ?? (order.location || ""), rightColX + 110, yR, rightColW - 118);
 
   // Table header (all columns must fit). Define exact widths and cumulative x positions
   const tableTop = metaTop + 108;
@@ -238,9 +261,9 @@ export async function streamPurchaseOrderPdf(res: Response, orderId: string, opt
   doc.rect(leftX, footerTop, pageWidth, 90).strokeColor("#000").lineWidth(0.8).stroke();
   // Left footer fields
   doc.fontSize(9).fillColor("#000");
-  doc.text("Received By", leftX + 8, footerTop + 8); doc.text(grn?.receivedBy || "", leftX + 100, footerTop + 8, { width: 200 });
-  doc.text("Name of person", leftX + 8, footerTop + 28); doc.text(grn?.personName || "", leftX + 100, footerTop + 28, { width: 200 });
-  doc.text("Remarks", leftX + 8, footerTop + 48); doc.text(grn?.remarks || "", leftX + 100, footerTop + 48, { width: 300 });
+  doc.text("Received By", leftX + 8, footerTop + 8); doc.text(header.receivedBy || grn?.receivedBy || "", leftX + 100, footerTop + 8, { width: 200 });
+  doc.text("Name of person", leftX + 8, footerTop + 28); doc.text(header.personName || grn?.personName || "", leftX + 100, footerTop + 28, { width: 200 });
+  doc.text("Remarks", leftX + 8, footerTop + 48); doc.text(header.remarks || grn?.remarks || "", leftX + 100, footerTop + 48, { width: 300 });
   // Signature area on right
   doc.text("Signature", rightX - 180, footerTop + 65, { width: 80, align: "right" });
   doc.text(grn?.personName || order.customerName || "", rightX - 90, footerTop + 65, { width: 85, align: "right" });

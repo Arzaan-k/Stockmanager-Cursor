@@ -70,6 +70,10 @@ export const api = {
     return apiRequest("GET", `/api/orders${qs ? `?${qs}` : ""}`);
   },
   getOrder: (id: string) => apiRequest("GET", `/api/orders/${id}`),
+  // PO Drafts
+  getPoDraft: (orderId: string) => apiRequest("GET", `/api/orders/${orderId}/po-draft`),
+  savePoDraft: (orderId: string, draft: any) => apiRequest("PUT", `/api/orders/${orderId}/po-draft`, draft),
+  deletePoDraft: (orderId: string) => apiRequest("DELETE", `/api/orders/${orderId}/po-draft`),
   createOrder: (orderData: any) => apiRequest("POST", "/api/orders", orderData),
   updateOrderStatus: (id: string, status: string) => apiRequest("PUT", `/api/orders/${id}/status`, { status }),
   requestApproval: (id: string, payload: any) => apiRequest("POST", `/api/orders/${id}/request-approval`, payload),

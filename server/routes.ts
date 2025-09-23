@@ -714,6 +714,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === PO Draft edit APIs ===
+  app.get("/api/orders/:id/po-draft", async (req, res) => {
+    try {
+      const draft = await storage.getPoDraft(req.params.id);
+      res.json(draft || {});
+    } catch (error) {
+      console.error("GET /api/orders/:id/po-draft error", error);
+      res.status(500).json({ error: "Failed to fetch PO draft" });
+    }
+  });
+
+  app.put("/api/orders/:id/po-draft", async (req, res) => {
+    try {
+      const draft = await storage.upsertPoDraft(req.params.id, req.body || {});
+      res.json(draft);
+    } catch (error) {
+      console.error("PUT /api/orders/:id/po-draft error", error);
+      res.status(500).json({ error: "Failed to save PO draft" });
+    }
+  });
+
+  app.delete("/api/orders/:id/po-draft", async (req, res) => {
+    try {
+      await storage.deletePoDraft(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("DELETE /api/orders/:id/po-draft error", error);
+      res.status(500).json({ error: "Failed to delete PO draft" });
+    }
+  });
+
   app.post("/api/orders", async (req, res) => {
     try {
       const { order: orderData, items } = req.body;

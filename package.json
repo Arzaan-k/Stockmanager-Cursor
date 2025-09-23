@@ -15,6 +15,8 @@
     "backfill-images": "tsx scripts/backfill-image-urls.ts",
     "migrate:add-product-images": "tsx scripts/migrate-add-product-images.ts",
     "migrate:images-to-db": "tsx scripts/migrate-images-to-db.ts",
+    "migrate:add-po-drafts": "tsx scripts/migrate-add-po-drafts.ts",
+    "migrate:add-purchases": "tsx scripts/migrate-add-purchases.ts",
     "update-legacy-urls": "tsx scripts/update-legacy-image-urls.ts"
   },
   "engines": {

@@ -8,6 +8,7 @@ import { ArrowLeft, FileText, User, Package, Calendar, MapPin } from "lucide-rea
 import { formatCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useState } from "react";
 
 export default function OrderDetail() {
@@ -39,6 +40,30 @@ export default function OrderDetail() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["/api/orders", orderId] });
     },
+  });
+
+  // === PO Draft state ===
+  const [poHeader, setPoHeader] = useState<any>({});
+  const [poItems, setPoItems] = useState<any[]>([]);
+
+  useQuery({
+    queryKey: ["/api/orders", orderId, "po-draft"],
+    queryFn: async () => {
+      const draft = await api.getPoDraft(orderId!).then(r => r.json());
+      setPoHeader(draft?.header || {});
+      setPoItems(draft?.items || []);
+      return draft;
+    },
+    enabled: !!orderId,
+  });
+
+  const saveDraft = useMutation({
+    mutationFn: async () => api.savePoDraft(orderId!, { header: poHeader, items: poItems }).then(r => r.json()),
+  });
+
+  const clearDraft = useMutation({
+    mutationFn: async () => api.deletePoDraft(orderId!).then(r => r.json()),
+    onSuccess: async () => { setPoHeader({}); setPoItems([]); },
   });
 
   if (!match) return null;
@@ -178,6 +203,41 @@ export default function OrderDetail() {
                 Download PO (PDF)
               </Button>
             </div>
+
+            {/* PO Draft Editor (minimal) */}
+            <Separator className="my-4" />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Purchase Order Draft</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Vendor Name</div>
+                    <Input value={poHeader.vendorName || ""} onChange={e => setPoHeader({ ...poHeader, vendorName: e.target.value })} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">PO No</div>
+                    <Input value={poHeader.poNo || ""} onChange={e => setPoHeader({ ...poHeader, poNo: e.target.value })} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Job Order No</div>
+                    <Input value={poHeader.jobOrderNo || ""} onChange={e => setPoHeader({ ...poHeader, jobOrderNo: e.target.value })} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">Location</div>
+                    <Input value={poHeader.location || ""} onChange={e => setPoHeader({ ...poHeader, location: e.target.value })} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => saveDraft.mutate()} disabled={saveDraft.isPending}>Save Draft</Button>
+                  <Button size="sm" variant="secondary" onClick={() => clearDraft.mutate()} disabled={clearDraft.isPending}>Clear Draft</Button>
+                  <a href={api.getOrderPoUrl(orderId!)} target="_blank" rel="noreferrer">
+                    <Button size="sm" variant="outline">Preview PO PDF</Button>
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
           </CardContent>
         </Card>
 

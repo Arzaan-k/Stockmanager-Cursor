@@ -211,6 +211,17 @@ export const grnItems = pgTable("grn_items", {
   amount: decimal("amount", { precision: 12, scale: 2 }),
 });
 
+// PO Drafts (editable purchase order overrides per order)
+export const poDrafts = pgTable("po_drafts", {
+  orderId: varchar("order_id").primaryKey().references(() => orders.id, { onDelete: "cascade" }),
+  // header overrides: { vendorName, vendorBillNo, indentNo, poNo, challanNo, grnDate, vendorBillDate, poDate, jobOrderNo, location, receivedBy, personName, remarks }
+  header: jsonb("header"),
+  // items overrides: array of rows { productId, name, sku, mfgPartCode, units, deficitQty, unitPrice, amount }
+  items: jsonb("items"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Add after existing tables
 export const purchases = pgTable('purchases', {
   id: varchar("id").default(sql`gen_random_uuid()`).primaryKey(),
