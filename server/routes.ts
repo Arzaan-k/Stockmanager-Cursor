@@ -21,6 +21,66 @@ import multer from "multer";
 import * as fs from 'fs';
 import * as path from 'path';
 
+// AI-powered search function
+async function performAISearch(query: string, products: any[], limit: number = 10): Promise<any[]> {
+  const searchTerms = query.toLowerCase().split(/\s+/);
+  const results = [];
+
+  for (const product of products) {
+    let score = 0;
+    const productText = `${product.name} ${product.description || ''} ${product.sku || ''} ${product.type || ''}`.toLowerCase();
+    
+    // Exact name match (highest priority)
+    if (product.name.toLowerCase().includes(query.toLowerCase())) {
+      score += 100;
+    }
+    
+    // SKU match
+    if (product.sku && product.sku.toLowerCase().includes(query.toLowerCase())) {
+      score += 90;
+    }
+    
+    // Description match
+    if (product.description && product.description.toLowerCase().includes(query.toLowerCase())) {
+      score += 70;
+    }
+    
+    // Type match
+    if (product.type && product.type.toLowerCase().includes(query.toLowerCase())) {
+      score += 60;
+    }
+    
+    // Partial word matches
+    for (const term of searchTerms) {
+      if (productText.includes(term)) {
+        score += 20;
+      }
+    }
+    
+    // Fuzzy matching for similar words
+    for (const term of searchTerms) {
+      for (const word of productText.split(/\s+/)) {
+        if (word.length > 3 && (word.includes(term) || term.includes(word))) {
+          score += 10;
+        }
+      }
+    }
+    
+    if (score > 0) {
+      results.push({
+        ...product,
+        relevanceScore: score,
+        matchType: score >= 90 ? 'exact' : score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low'
+      });
+    }
+  }
+  
+  // Sort by relevance score and return top results
+  return results
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .slice(0, limit);
+}
+
 // Configure multer for image uploads
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -1157,6 +1217,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting image recognition status:", error);
       res.status(500).json({ error: "Failed to get status" });
+    }
+  });
+
+  // AI-powered natural language product search
+  app.post("/api/ai/search", async (req, res) => {
+    try {
+      const { query, limit = 10 } = req.body;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+
+      const products = await storage.getProducts();
+      const searchResults = await performAISearch(query, products, limit);
+      
+      res.json({
+        success: true,
+        query,
+        results: searchResults,
+        total: searchResults.length
+      });
+    } catch (error) {
+      console.error("Error performing AI search:", error);
+      res.status(500).json({ error: "Failed to perform search" });
+    }
+  });
+
+  // Get AI service status
+  app.get("/api/ai/status", async (req, res) => {
+    try {
+      const status = imageRecognitionService.getStatus();
+      res.json({
+        success: true,
+        status
+      });
+    } catch (error) {
+      console.error("Error getting AI status:", error);
+      res.status(500).json({ error: "Failed to get AI status" });
     }
   });
 

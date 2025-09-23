@@ -14,6 +14,7 @@ interface ImageProcessingResult {
   processingTime: number;
   success: boolean;
   error?: string;
+  extractedText?: string;
 }
 
 import * as tf from '@tensorflow/tfjs';
@@ -21,6 +22,7 @@ import axios from 'axios';
 import { storage } from '../storage';
 import * as crypto from 'crypto';
 import sharp from 'sharp';
+import { createWorker } from 'tesseract.js';
 
 // Update class declaration
 export class ImageRecognitionService {
@@ -31,6 +33,7 @@ export class ImageRecognitionService {
   private productColors: Map<string, Float32Array> = new Map(); // Add to class
   private processedMessageIds: Set<string> = new Set();
   private accessToken: string = process.env.WHATSAPP_ACCESS_TOKEN || '';
+  private ocrWorker: any = null;
 
   constructor() {
     // Start initialization
@@ -45,6 +48,7 @@ export class ImageRecognitionService {
       
       // Load models in sequence for reliability
       await this.loadTensorFlowModel();
+      await this.initializeOCR();
       
       // Precompute product features
       await this.precomputeProductFeatures();
@@ -94,6 +98,23 @@ export class ImageRecognitionService {
     } catch (error: any) {
       console.error('❌ TensorFlow model failed to load:', error?.message);
       this.tensorflowModel = null;
+    }
+  }
+
+  private async initializeOCR(): Promise<void> {
+    try {
+      console.log('📝 Initializing OCR worker...');
+      this.ocrWorker = await createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        }
+      });
+      console.log('✅ OCR worker initialized');
+    } catch (error: any) {
+      console.error('❌ Failed to initialize OCR:', error?.message);
+      this.ocrWorker = null;
     }
   }
 
@@ -262,16 +283,43 @@ export class ImageRecognitionService {
     return Math.sqrt(dist);
   }
 
+  // Extract text from image using OCR
+  private async extractTextFromImage(imageBuffer: Buffer): Promise<string> {
+    try {
+      if (!this.ocrWorker) {
+        console.warn('OCR worker not available');
+        return '';
+      }
+
+      console.log('🔍 Extracting text from image...');
+      const { data: { text } } = await this.ocrWorker.recognize(imageBuffer);
+      
+      // Clean up the extracted text
+      const cleanedText = text
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+        .replace(/\n+/g, ' ') // Replace newlines with spaces
+        .trim();
+      
+      console.log(`📝 Extracted text: "${cleanedText}"`);
+      return cleanedText;
+    } catch (error: any) {
+      console.warn('OCR text extraction failed:', error?.message);
+      return '';
+    }
+  }
+
   // Enhanced feature extraction combining multiple methods
   private async extractVisualFeatures(imageBuffer: Buffer): Promise<{
     tfFeatures: Float32Array | null;
     perceptualHash: string;
     dominantColor: Float32Array;
+    extractedText?: string;
   }> {
     const features = {
       tfFeatures: null as Float32Array | null,
       perceptualHash: '',
-      dominantColor: new Float32Array(3)
+      dominantColor: new Float32Array(3),
+      extractedText: ''
     };
     
     try {
@@ -299,6 +347,9 @@ export class ImageRecognitionService {
       if (features.perceptualHash.length < 16) {
         console.warn('❌ Hash short - fallback used');
       }
+
+      // Extract text using OCR
+      features.extractedText = await this.extractTextFromImage(imageBuffer);
       
       // Dominant color always tries, but validate pixelCount >0
       const { data } = await sharp(imageBuffer)
@@ -585,13 +636,29 @@ export class ImageRecognitionService {
   public getStatus(): {
     initialized: boolean;
     productsIndexed: number;
-    models: { tensorflow: boolean; };
+    models: { tensorflow: boolean; ocr: boolean; };
   } {
     return {
       initialized: this.isInitialized,
       productsIndexed: this.productFeatures.size,
-      models: { tensorflow: !!this.tensorflowModel }
+      models: { 
+        tensorflow: !!this.tensorflowModel,
+        ocr: !!this.ocrWorker
+      }
     };
+  }
+
+  // Cleanup resources
+  public async cleanup(): Promise<void> {
+    try {
+      if (this.ocrWorker) {
+        await this.ocrWorker.terminate();
+        this.ocrWorker = null;
+        console.log('✅ OCR worker terminated');
+      }
+    } catch (error) {
+      console.warn('Failed to cleanup OCR worker:', error);
+    }
   }
 
   // Reload features after database changes
@@ -683,7 +750,8 @@ export class ImageRecognitionService {
       return {
         matches,
         processingTime: Date.now() - startTime,
-        success: true
+        success: true,
+        extractedText: queryFeatures.extractedText
       };
       
     } catch (error: any) {
@@ -711,7 +779,8 @@ export class ImageRecognitionService {
       return {
         matches,
         processingTime: Date.now() - startTime,
-        success: true
+        success: true,
+        extractedText: queryFeatures.extractedText
       };
       
     } catch (error: any) {
