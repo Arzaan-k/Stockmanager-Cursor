@@ -1,5 +1,6 @@
 import { storage } from '../storage';
 import { imageRecognitionService } from './image-recognition';
+import { databaseImageStorage } from './database-image-storage';
 import axios from 'axios';
 // import sharp from 'sharp';  // Temporarily disabled for Windows compatibility
 let sharp: any = null;
@@ -73,7 +74,6 @@ export class ProductImageManager {
       let processedBuffer = imageBuffer;
       const fileExtension = format === 'jpeg' ? 'jpg' : format;
       const filename = `${productId}-${nanoid()}.${fileExtension}`;
-      const filePath = path.join(this.imagesDir, filename);
       
       if (sharp) {
         try {
@@ -97,26 +97,31 @@ export class ProductImageManager {
             processedImage = processedImage.webp({ quality });
           }
 
-          await processedImage.toFile(filePath);
+          processedBuffer = await processedImage.toBuffer();
         } catch (error) {
-          console.warn('Sharp processing failed, saving original image:', error.message);
-          // Save original buffer if Sharp fails
-          fs.writeFileSync(filePath, imageBuffer);
+          console.warn('Sharp processing failed, using original image:', error.message);
+          // Use original buffer if Sharp fails
         }
-      } else {
-        // Save original buffer if Sharp not available
-        fs.writeFileSync(filePath, imageBuffer);
       }
 
-      // Create URL for the image (relative by default)
-      let imageUrl = `${this.baseUrl}/uploads/products/${filename}`;
-      // If URL contains localhost in DB history, strip host and make relative
-      try {
-        const u = new URL(imageUrl);
-        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
-          imageUrl = u.pathname;
-        }
-      } catch {}
+      // Store image in database
+      const mimeType = format === 'jpeg' ? 'image/jpeg' : 
+                      format === 'png' ? 'image/png' : 
+                      format === 'webp' ? 'image/webp' : 'image/jpeg';
+      
+      const storeResult = await databaseImageStorage.storeImage(
+        productId, 
+        processedBuffer, 
+        filename, 
+        mimeType
+      );
+
+      if (!storeResult.success) {
+        return { success: false, error: storeResult.error };
+      }
+
+      // Create URL for the image (API endpoint)
+      const imageUrl = `/api/images/${storeResult.imageId}`;
 
       // Update product in database
       let photos = [];
@@ -128,7 +133,8 @@ export class ProductImageManager {
         url: imageUrl,
         filename,
         uploadedAt: new Date().toISOString(),
-        type: 'product_image'
+        type: 'product_image',
+        imageId: storeResult.imageId
       });
 
       // Update the main imageUrl if this is the first image
@@ -144,7 +150,7 @@ export class ProductImageManager {
         await this.indexProductImage(productId, imageUrl);
       }
 
-      console.log(`Saved product image: ${filename} for product ${productId}`);
+      console.log(`Saved product image: ${filename} for product ${productId} (ID: ${storeResult.imageId})`);
       
       return { success: true, imageUrl };
 
@@ -241,6 +247,19 @@ export class ProductImageManager {
     uploadedAt: string;
   }>> {
     try {
+      // Get images from database storage
+      const dbResult = await databaseImageStorage.getProductImages(productId);
+      if (dbResult.success && dbResult.images) {
+        const images = dbResult.images.map(img => ({
+          url: img.url,
+          filename: img.filename,
+          uploadedAt: img.createdAt
+        }));
+        console.log(`Retrieved ${images.length} images from database for product ${productId}`);
+        return images;
+      }
+
+      // Fallback to legacy photos field
       const product = await storage.getProduct(productId);
       if (!product) {
         return [];

@@ -534,3 +534,17 @@ export type VendorContact = typeof vendorContacts.$inferSelect;
 export type InsertVendorContact = typeof vendorContacts.$inferInsert;
 export type VendorTransaction = typeof vendorTransactions.$inferSelect;
 export type InsertVendorTransaction = typeof vendorTransactions.$inferInsert;
+
+// Product Images table for storing images in database
+export const productImages = pgTable("product_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  data: text("data").notNull(), // base64 encoded image data
+  size: integer("size").notNull(), // size in bytes
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ProductImage = typeof productImages.$inferSelect;
+export type InsertProductImage = typeof productImages.$inferInsert;

@@ -5,13 +5,16 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/index.js --sourcemap && mkdir -p dist/uploads && cp -r uploads/* dist/uploads || true",
+    "build": "vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/index.js --sourcemap && mkdir -p dist/uploads/products && cp -r uploads/products/* dist/uploads/products/ 2>/dev/null || true",
     "vercel-build": "npm run build",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "npx tsc --noEmit",
     "db:push": "drizzle-kit push",
     "seed": "tsx scripts/seed.ts",
-    "db:seed": "npm run db:push && npm run seed"
+    "db:seed": "npm run db:push && npm run seed",
+    "backfill-images": "tsx scripts/backfill-image-urls.ts",
+    "migrate:add-product-images": "tsx scripts/migrate-add-product-images.ts",
+    "migrate:images-to-db": "tsx scripts/migrate-images-to-db.ts"
   },
   "engines": {
     "node": "20.x"

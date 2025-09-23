@@ -16,6 +16,7 @@ import { registerEmployeeRoutes } from "./routes/employee";
 import { authenticate, authorize, AuthenticatedRequest } from "./auth/middleware";
 import { imageRecognitionService } from "./services/image-recognition";
 import { productImageManager } from "./services/product-image-manager";
+import { databaseImageStorage } from "./services/database-image-storage";
 import multer from "multer";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1219,7 +1220,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded product images
+  // Serve images from database
+  app.get('/api/images/:imageId', async (req, res) => {
+    try {
+      const { imageId } = req.params;
+      const result = await databaseImageStorage.getImage(imageId);
+      
+      if (!result.success) {
+        return res.status(404).json({ error: result.error });
+      }
+
+      res.set({
+        'Content-Type': result.mimeType || 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
+        'Content-Length': result.buffer.length
+      });
+      
+      res.send(result.buffer);
+    } catch (error) {
+      console.error('Error serving image:', error);
+      res.status(500).json({ error: 'Failed to serve image' });
+    }
+  });
+
+  // Serve uploaded product images (legacy fallback)
   app.use('/uploads/products', express.static(path.join(process.cwd(), 'uploads', 'products')));
   // Also serve static uploads from dist when running from compiled build
   app.use('/uploads', express.static(path.join(process.cwd(), 'dist', 'uploads')));
