@@ -17,6 +17,7 @@ import { authenticate, authorize, AuthenticatedRequest } from "./auth/middleware
 import { imageRecognitionService } from "./services/image-recognition";
 import { productImageManager } from "./services/product-image-manager";
 import { databaseImageStorage } from "./services/database-image-storage";
+import { recommendationService } from "./services/recommendation-service";
 import multer from "multer";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1254,6 +1255,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting AI status:", error);
       res.status(500).json({ error: "Failed to get AI status" });
+    }
+  });
+
+  // Get product recommendations
+  app.get("/api/recommendations", async (req, res) => {
+    try {
+      const { type, limit = 20 } = req.query;
+      let recommendations;
+
+      switch (type) {
+        case 'low-stock':
+          recommendations = await recommendationService.getLowStockRecommendations(Number(limit));
+          break;
+        case 'frequently-used':
+          recommendations = await recommendationService.getFrequentlyUsedRecommendations(Number(limit));
+          break;
+        case 'trending':
+          recommendations = await recommendationService.getTrendingRecommendations(Number(limit));
+          break;
+        default:
+          recommendations = await recommendationService.getAllRecommendations(Number(limit));
+      }
+
+      res.json({
+        success: true,
+        type: type || 'all',
+        recommendations,
+        total: recommendations.length
+      });
+    } catch (error) {
+      console.error("Error getting recommendations:", error);
+      res.status(500).json({ error: "Failed to get recommendations" });
+    }
+  });
+
+  // Get similar product recommendations
+  app.get("/api/recommendations/similar/:productId", async (req, res) => {
+    try {
+      const { productId } = req.params;
+      const { limit = 5 } = req.query;
+      
+      const recommendations = await recommendationService.getSimilarProductRecommendations(
+        productId, 
+        Number(limit)
+      );
+
+      res.json({
+        success: true,
+        productId,
+        recommendations,
+        total: recommendations.length
+      });
+    } catch (error) {
+      console.error("Error getting similar product recommendations:", error);
+      res.status(500).json({ error: "Failed to get similar product recommendations" });
+    }
+  });
+
+  // Get personalized recommendations for user
+  app.get("/api/recommendations/personalized", authenticate, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { limit = 10 } = req.query;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const recommendations = await recommendationService.getPersonalizedRecommendations(
+        userId, 
+        Number(limit)
+      );
+
+      res.json({
+        success: true,
+        userId,
+        recommendations,
+        total: recommendations.length
+      });
+    } catch (error) {
+      console.error("Error getting personalized recommendations:", error);
+      res.status(500).json({ error: "Failed to get personalized recommendations" });
     }
   });
 
