@@ -14,7 +14,8 @@
     "db:seed": "npm run db:push && npm run seed",
     "backfill-images": "tsx scripts/backfill-image-urls.ts",
     "migrate:add-product-images": "tsx scripts/migrate-add-product-images.ts",
-    "migrate:images-to-db": "tsx scripts/migrate-images-to-db.ts"
+    "migrate:images-to-db": "tsx scripts/migrate-images-to-db.ts",
+    "update-legacy-urls": "tsx scripts/update-legacy-image-urls.ts"
   },
   "engines": {
     "node": "20.x"

@@ -103,6 +103,13 @@ export class ImageRecognitionService {
 
   private async initializeOCR(): Promise<void> {
     try {
+      // Skip OCR initialization if disabled (default for performance)
+      if (process.env.DISABLE_OCR === 'true' || process.env.ENABLE_OCR !== 'true') {
+        console.log('📝 OCR disabled (set ENABLE_OCR=true to enable)');
+        this.ocrWorker = null;
+        return;
+      }
+
       console.log('📝 Initializing OCR worker...');
       this.ocrWorker = await createWorker('eng', 1, {
         logger: m => {
@@ -283,11 +290,11 @@ export class ImageRecognitionService {
     return Math.sqrt(dist);
   }
 
-  // Extract text from image using OCR
+  // Extract text from image using OCR (optional, disabled by default for performance)
   private async extractTextFromImage(imageBuffer: Buffer): Promise<string> {
     try {
-      if (!this.ocrWorker) {
-        console.warn('OCR worker not available');
+      // Skip OCR if disabled for performance
+      if (process.env.DISABLE_OCR === 'true' || !this.ocrWorker) {
         return '';
       }
 
@@ -303,7 +310,7 @@ export class ImageRecognitionService {
       console.log(`📝 Extracted text: "${cleanedText}"`);
       return cleanedText;
     } catch (error: any) {
-      console.warn('OCR text extraction failed:', error?.message);
+      console.warn(`OCR failed (${error?.message}) - continuing without text extraction`);
       return '';
     }
   }
@@ -348,7 +355,7 @@ export class ImageRecognitionService {
         console.warn('❌ Hash short - fallback used');
       }
 
-      // Extract text using OCR
+      // Extract text using OCR (optional)
       features.extractedText = await this.extractTextFromImage(imageBuffer);
       
       // Dominant color always tries, but validate pixelCount >0
@@ -406,12 +413,54 @@ export class ImageRecognitionService {
         
         let usedVisual = false;
         
-        // Try to get images from database first
-        if (product.imageUrl && product.imageUrl.startsWith('/api/images/')) {
+        // First, try to get images from database storage using the productImageManager
+        try {
+          const { productImageManager } = await import('./product-image-manager');
+          const images = await productImageManager.getProductImages(product.id);
+          
+          if (images.length > 0) {
+            // Use the first available image
+            const firstImage = images[0];
+            if (firstImage.url.startsWith('/api/images/')) {
+              const baseUrl = process.env.BASE_URL || 'http://localhost:10000';
+              const fullImageUrl = `${baseUrl}${firstImage.url}`;
+              
+              const response = await axios.get(fullImageUrl, { 
+                responseType: 'arraybuffer', 
+                timeout: 10000 
+              });
+              const imageBuffer = Buffer.from(response.data);
+              const features = await this.extractVisualFeatures(imageBuffer);
+              
+              if (features.tfFeatures && features.tfFeatures.length > 0) {
+                this.productFeatures.set(product.id, features.tfFeatures);
+                this.productHashes.set(product.id, features.perceptualHash);
+                this.productColors.set(product.id, features.dominantColor);
+                usedVisual = true;
+                successCount++;
+                console.log(`✅ Precomputed features for ${product.name} from database`);
+              }
+            }
+          }
+        } catch (error: any) {
+          console.warn(`Database image processing failed for ${product.name}: ${error.message}`);
+        }
+        
+        // Fallback: try imageUrl field if database images not available
+        if (!usedVisual && product.imageUrl) {
           try {
-            const baseUrl = process.env.BASE_URL || 'http://localhost:10000';
-            const fullImageUrl = product.imageUrl.startsWith('http') ? product.imageUrl : `${baseUrl}${product.imageUrl}`;
-            const response = await axios.get(fullImageUrl, { 
+            let imageUrl = product.imageUrl;
+            
+            // Handle relative URLs
+            if (imageUrl.startsWith('/api/images/')) {
+              const baseUrl = process.env.BASE_URL || 'http://localhost:10000';
+              imageUrl = `${baseUrl}${imageUrl}`;
+            } else if (imageUrl.startsWith('/uploads/')) {
+              // Skip legacy filesystem URLs - these are likely broken
+              throw new Error('Legacy filesystem URL - skipping');
+            }
+            
+            const response = await axios.get(imageUrl, { 
               responseType: 'arraybuffer', 
               timeout: 10000 
             });
@@ -424,31 +473,17 @@ export class ImageRecognitionService {
               this.productColors.set(product.id, features.dominantColor);
               usedVisual = true;
               successCount++;
+              console.log(`✅ Precomputed features for ${product.name} from URL`);
             }
           } catch (imageError: any) {
-            console.warn(`Database image fetch failed for ${product.name}: ${imageError.message}`);
+            // Don't log legacy filesystem errors - they're expected
+            if (!imageError.message.includes('Legacy filesystem URL')) {
+              console.warn(`Image fetch failed for ${product.name}: ${imageError.message}`);
+            }
           }
         }
         
-        // Fallback to legacy filesystem images
-        if (!usedVisual && product.imageUrl && !product.imageUrl.startsWith('/api/images/')) {
-          try {
-            const response = await axios.get(product.imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
-            const imageBuffer = Buffer.from(response.data);
-            const features = await this.extractVisualFeatures(imageBuffer);
-            
-            if (features.tfFeatures && features.tfFeatures.length > 0) {
-              this.productFeatures.set(product.id, features.tfFeatures);
-              this.productHashes.set(product.id, features.perceptualHash);
-              this.productColors.set(product.id, features.dominantColor);
-              usedVisual = true;
-              successCount++;
-            }
-          } catch (imageError: any) {
-            console.warn(`Legacy image fetch failed for ${product.name}: ${imageError.message}`);
-          }
-        }
-        
+        // Create fallback features for products without images
         if (!usedVisual) {
           const zeroFeatures = new Float32Array(1024).fill(0);
           const zeroColor = new Float32Array([0.5, 0.5, 0.5]); // Gray
@@ -466,22 +501,22 @@ export class ImageRecognitionService {
     }
   }
 
-  // Core matching algorithm combining multiple signals
+  // Core matching algorithm focusing on visual similarity
   private async matchProductFeatures(
     queryFeatures: { tfFeatures: Float32Array | null; perceptualHash: string; dominantColor: Float32Array; },
     products: any[]
   ): Promise<ProductMatch[]> {
     const matches: ProductMatch[] = [];
     
-    // Hash matching
+    // Hash matching (most reliable for exact/near-exact matches)
     for (const product of products) {
       const productHash = this.productHashes.get(product.id);
-      if (productHash) {
+      if (productHash && productHash !== '0000000000000000') {
         const distance = this.hammingDistance(queryFeatures.perceptualHash, productHash);
         const similarity = 1 - (distance / 16); // 16 hex chars = 64 bits
         
-        if (similarity > 0.5) { // Lowered to catch 69%
-          const confidence = similarity * 0.85;
+        if (similarity > 0.6) { // Higher threshold for hash matching
+          const confidence = Math.min(0.95, similarity * 0.9); // Cap at 95%
           matches.push({
             productId: product.id,
             productName: product.name,
@@ -489,30 +524,29 @@ export class ImageRecognitionService {
             confidence,
             description: product.description || null,
             imageUrl: product.imageUrl || null,
-            matchType: 'hash'
+            matchType: 'visual_hash'
           });
-          console.log(`🎯 Hash: ${product.name} (${Math.round(similarity*100)}%, conf ${Math.round(confidence*100)}%)`);
-        } else if (similarity > 0.4) {
-          console.log(`Hash low: ${product.name} (${Math.round(similarity*100)}%)`);
+          console.log(`🎯 Visual Hash: ${product.name} (${Math.round(similarity*100)}%, conf ${Math.round(confidence*100)}%)`);
         }
       }
     }
     
-    // TF matching
+    // TensorFlow deep feature matching (for visual similarity)
     if (queryFeatures.tfFeatures && queryFeatures.tfFeatures.length === 1024) {
       for (const product of products) {
         const productFeatures = this.productFeatures.get(product.id);
         if (productFeatures && productFeatures.length === 1024) {
-          let similarity = this.cosineSimilarity(queryFeatures.tfFeatures!, productFeatures); // ! since guarded
-          
+          // Skip zero features (no actual image data)
           if (productFeatures.every((f: number) => f === 0)) {
-            similarity *= 0.01;
+            continue;
           }
           
-          if (similarity > 0.15) { // Lowered further
-            let confidence = similarity * 0.4; // Adjusted weight
+          let similarity = this.cosineSimilarity(queryFeatures.tfFeatures!, productFeatures);
+          
+          if (similarity > 0.3) { // Higher threshold for TF features
+            let confidence = Math.min(0.85, similarity * 0.7); // More conservative confidence
             
-            // Color boost
+            // Visual feature boost (color similarity)
             let colorDist: number | undefined;
             const productColor = this.productColors.get(product.id);
             let colorBoost = 0;
@@ -535,12 +569,15 @@ export class ImageRecognitionService {
               }
             }
             
-            console.log(`🎨 TF: ${product.name} (sim ${Math.round(similarity*100)}%, final conf ${Math.round(confidence*100)}%)`);
+            console.log(`🎨 Visual TF: ${product.name} (sim ${Math.round(similarity*100)}%, final conf ${Math.round(confidence*100)}%)`);
             
             // Push/update with confidence
             let existing = matches.find(m => m.productId === product.id);
             if (existing) {
-              existing.confidence = Math.max(existing.confidence, confidence);
+              if (confidence > existing.confidence) {
+                existing.confidence = confidence;
+                existing.matchType = hashSim > 0.6 ? 'visual_combined' : 'visual_features';
+              }
             } else {
               matches.push({
                 productId: product.id,
@@ -549,7 +586,7 @@ export class ImageRecognitionService {
                 confidence,
                 description: product.description || null,
                 imageUrl: product.imageUrl || null,
-                matchType: hashSim > 0.6 ? 'hash+tf' : 'tf'
+                matchType: hashSim > 0.6 ? 'visual_combined' : 'visual_features'
               });
             }
           } else if (similarity > 0.1) {

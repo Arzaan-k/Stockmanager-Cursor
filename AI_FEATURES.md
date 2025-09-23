@@ -6,11 +6,13 @@ The Stock Manager application now includes comprehensive AI-powered features for
 
 ## 🤖 AI Features Implemented
 
-### 1. Image Recognition & OCR
-- **Visual Product Recognition**: Uses TensorFlow MobileNet for visual feature extraction
-- **OCR Text Extraction**: Extracts text from product images using Tesseract.js
-- **Multi-modal Matching**: Combines visual features, text, and metadata for accurate product identification
+### 1. Visual Product Recognition
+- **Deep Visual Features**: Uses TensorFlow MobileNet for advanced visual feature extraction
+- **Perceptual Hashing**: Creates visual fingerprints for exact and near-exact image matching
+- **Color Analysis**: Analyzes dominant colors for additional visual matching signals
+- **Multi-layer Matching**: Combines hash matching, deep features, and color similarity
 - **Database Image Storage**: All images stored in database for production compatibility
+- **Optional OCR**: Text extraction available but disabled by default for performance
 
 #### Endpoints:
 - `POST /api/image-recognition/identify` - Upload image for product identification
@@ -58,6 +60,9 @@ DISABLE_IMAGE_PREFETCH=true
 
 # Optional: Disable image indexing for faster uploads
 DISABLE_IMAGE_INDEXING=true
+
+# Optional: Enable OCR text extraction (disabled by default for performance)
+ENABLE_OCR=true
 
 # Base URL for image serving
 BASE_URL=https://your-domain.com
@@ -117,11 +122,16 @@ console.log('Similar Products:', result.recommendations);
 
 ## 📊 Performance Features
 
-### Image Processing
-- **Sharp Integration**: High-performance image processing
-- **Format Support**: JPEG, PNG, WebP, AVIF
-- **Automatic Resizing**: Optimizes images for recognition
-- **Caching**: Images cached with proper headers
+### Visual Recognition Pipeline
+- **Image Preprocessing**: Automatic format conversion and resizing to 224x224
+- **Feature Extraction**: TensorFlow MobileNet generates 1024-dimensional feature vectors
+- **Perceptual Hashing**: Creates 64-bit visual fingerprints for exact matching
+- **Color Profiling**: Extracts dominant color signatures for additional matching
+- **Multi-Stage Matching**: 
+  1. Perceptual hash matching (>60% similarity for high confidence)
+  2. Deep feature cosine similarity (>30% threshold)
+  3. Color similarity boosting for final confidence
+- **Format Support**: JPEG, PNG, WebP (OCR supports fewer formats)
 
 ### OCR Processing
 - **Tesseract.js**: Fast, accurate text extraction
