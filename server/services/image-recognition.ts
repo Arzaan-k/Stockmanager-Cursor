@@ -333,6 +333,12 @@ export class ImageRecognitionService {
   // Precompute features for all products
   private async precomputeProductFeatures(): Promise<void> {
     try {
+      // Skip precomputing if disabled via environment variable
+      if (process.env.DISABLE_IMAGE_PREFETCH === 'true') {
+        console.log('📊 Skipping image precomputing (DISABLE_IMAGE_PREFETCH=true)');
+        return;
+      }
+
       console.log('📊 Precomputing visual features...');
       const products = await storage.getProducts();
       
@@ -349,7 +355,32 @@ export class ImageRecognitionService {
         
         let usedVisual = false;
         
-        if (product.imageUrl) {
+        // Try to get images from database first
+        if (product.imageUrl && product.imageUrl.startsWith('/api/images/')) {
+          try {
+            const baseUrl = process.env.BASE_URL || 'http://localhost:10000';
+            const fullImageUrl = product.imageUrl.startsWith('http') ? product.imageUrl : `${baseUrl}${product.imageUrl}`;
+            const response = await axios.get(fullImageUrl, { 
+              responseType: 'arraybuffer', 
+              timeout: 10000 
+            });
+            const imageBuffer = Buffer.from(response.data);
+            const features = await this.extractVisualFeatures(imageBuffer);
+            
+            if (features.tfFeatures && features.tfFeatures.length > 0) {
+              this.productFeatures.set(product.id, features.tfFeatures);
+              this.productHashes.set(product.id, features.perceptualHash);
+              this.productColors.set(product.id, features.dominantColor);
+              usedVisual = true;
+              successCount++;
+            }
+          } catch (imageError: any) {
+            console.warn(`Database image fetch failed for ${product.name}: ${imageError.message}`);
+          }
+        }
+        
+        // Fallback to legacy filesystem images
+        if (!usedVisual && product.imageUrl && !product.imageUrl.startsWith('/api/images/')) {
           try {
             const response = await axios.get(product.imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
             const imageBuffer = Buffer.from(response.data);
@@ -363,7 +394,7 @@ export class ImageRecognitionService {
               successCount++;
             }
           } catch (imageError: any) {
-            console.warn(`Image fetch failed for ${product.name}`);
+            console.warn(`Legacy image fetch failed for ${product.name}: ${imageError.message}`);
           }
         }
         
@@ -571,6 +602,61 @@ export class ImageRecognitionService {
     this.productColors.clear();
     await this.precomputeProductFeatures();
     console.log('✅ Reloaded');
+  }
+
+  // Index a single product image (called when new images are uploaded)
+  public async indexProductImage(productId: string, imageUrl: string): Promise<void> {
+    try {
+      if (!this.isInitialized) {
+        console.warn('Image recognition service not initialized, skipping indexing');
+        return;
+      }
+
+      let imageBuffer: Buffer | null = null;
+
+      // Try to fetch from database first
+      if (imageUrl.startsWith('/api/images/')) {
+        try {
+          const baseUrl = process.env.BASE_URL || 'http://localhost:10000';
+          const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${baseUrl}${imageUrl}`;
+          const response = await axios.get(fullImageUrl, { 
+            responseType: 'arraybuffer', 
+            timeout: 10000 
+          });
+          imageBuffer = Buffer.from(response.data);
+        } catch (error) {
+          console.warn(`Failed to fetch database image for ${productId}:`, error.message);
+        }
+      } else {
+        // Try legacy filesystem image
+        try {
+          const response = await axios.get(imageUrl, { 
+            responseType: 'arraybuffer', 
+            timeout: 10000 
+          });
+          imageBuffer = Buffer.from(response.data);
+        } catch (error) {
+          console.warn(`Failed to fetch legacy image for ${productId}:`, error.message);
+        }
+      }
+
+      if (imageBuffer) {
+        const features = await this.extractVisualFeatures(imageBuffer);
+        
+        if (features.tfFeatures && features.tfFeatures.length > 0) {
+          this.productFeatures.set(productId, features.tfFeatures);
+          this.productHashes.set(productId, features.perceptualHash);
+          this.productColors.set(productId, features.dominantColor);
+          console.log(`✅ Indexed image for product ${productId}`);
+        } else {
+          console.warn(`Failed to extract features for product ${productId}`);
+        }
+      } else {
+        console.warn(`No image data available for product ${productId}`);
+      }
+    } catch (error) {
+      console.warn(`Failed to index image for product ${productId}:`, error.message);
+    }
   }
 
   // Process image from URL (WhatsApp handler calls this)
