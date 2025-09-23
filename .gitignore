@@ -1,9 +1,15 @@
+# dependencies
 node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
-.vercel
+
+# env
 .env
+.env.local
+.env.*.local
+
+# build
+/dist
+
+# misc
+.DS_Store
+*.log
 

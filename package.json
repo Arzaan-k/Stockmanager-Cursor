@@ -5,13 +5,16 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
-    "build": "vite build && npx tsc --project tsconfig.json --outDir dist --moduleResolution node --declaration false --esModuleInterop true --allowSyntheticDefaultImports true && esbuild server/index.ts --platform=node --packages=external --format=esm --outdir=dist --sourcemap",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --format=esm --outfile=dist/index.js --sourcemap",
     "vercel-build": "npm run build",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "npx tsc --noEmit",
     "db:push": "drizzle-kit push",
     "seed": "tsx scripts/seed.ts",
     "db:seed": "npm run db:push && npm run seed"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@google/genai": "^1.16.0",
