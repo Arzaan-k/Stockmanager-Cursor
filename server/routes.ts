@@ -8,6 +8,7 @@ import { enhancedWhatsAppService } from "./services/whatsapp-enhanced";
 import { parseInventoryCommand } from "./services/gemini";
 import { z } from "zod";
 import { insertProductSchema, insertOrderSchema, insertOrderItemSchema, insertCustomerSchema, insertWarehouseSchema, users } from "@shared/schema";
+import jwt from "jsonwebtoken";
 import { sql } from "drizzle-orm";
 import { streamPurchaseOrderPdf } from "./services/po";
 import { registerVendorRoutes } from "./routes/vendors";
@@ -71,9 +72,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // For development, use mock token; in production, use proper JWT
-      const token = process.env.NODE_ENV === 'production' 
-        ? require('jsonwebtoken').sign(
-            { userId: user.id, username: user.username, role: user.role }, 
+      const token = process.env.NODE_ENV === 'production'
+        ? jwt.sign(
+            { userId: user.id, username: user.username, role: user.role },
             process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '24h' }
           )
