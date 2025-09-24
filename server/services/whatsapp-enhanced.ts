@@ -341,13 +341,18 @@ export class EnhancedWhatsAppService {
     
     // We have everything, ask for confirmation
     state.pendingStockAddition.awaitingConfirmation = true;
-    return `📦 Stock Addition Request:\n` +
-           `Product: ${state.pendingStockAddition.productName} (SKU: ${state.pendingStockAddition.sku})\n` +
-           `Current stock: ${state.pendingStockAddition.currentStock} units\n` +
-           `Adding: ${state.pendingStockAddition.quantity} units\n` +
-           `New stock will be: ${state.pendingStockAddition.currentStock + state.pendingStockAddition.quantity} units\n` +
-           `Added by: ${state.userName}\n\n` +
-           `Reply with "yes" to confirm or "no" to cancel.`;
+      await this.sendInteractiveButtons(
+        userPhone,
+        `📦 Stock Addition Request\n\n` +
+        `Product: ${state.pendingStockAddition.productName} (SKU: ${state.pendingStockAddition.sku})\n` +
+        `Current: ${state.pendingStockAddition.currentStock} • Add: ${state.pendingStockAddition.quantity} • New: ${state.pendingStockAddition.currentStock + state.pendingStockAddition.quantity}`,
+        [
+          { id: "stock:confirm", title: "Confirm" },
+          { id: "stock:cancel", title: "Cancel" }
+        ],
+        "Confirm Stock Addition"
+      );
+      return "";
   }
   
   // Handle order creation flow
@@ -455,14 +460,18 @@ export class EnhancedWhatsAppService {
             };
             order.step = 'awaiting_backorder_choice';
             
-            return `⚠️ Limited stock!\n` +
-                   `Product: ${product.name}\n` +
-                   `Requested: ${quantity} units\n` +
-                   `Available: ${available} units\n\n` +
-                   `Would you like to:\n` +
-                   `1. Order ${available} units (available stock)\n` +
-                   `2. Place order for ${quantity} units anyway (backorder)\n` +
-                   `3. Cancel this item`;
+            await this.sendInteractiveButtons(
+              userPhone,
+              `⚠️ Limited stock!\n\n` +
+              `Product: ${product.name}\nRequested: ${quantity} • Available: ${available}`,
+              [
+                { id: "order:available", title: `Order ${available}` },
+                { id: "order:backorder", title: `Backorder ${quantity}` },
+                { id: "order:cancel", title: "Cancel Item" }
+              ],
+              "Choose an option"
+            );
+            return "";
           }
           
           // Add to order - stock is sufficient
@@ -534,17 +543,18 @@ export class EnhancedWhatsAppService {
             `${i + 1}. ${item.productName} (${item.sku}) - ${item.quantity} units`
           ).join('\n');
           
-          return `📋 ORDER SUMMARY\n` +
-                 `${'='.repeat(30)}\n` +
-                 `Items:\n${itemsList}\n\n` +
-                 `Customer: ${order.customerName}\n` +
-                 `Phone: ${order.customerPhone}\n` +
-                 `Email: ${order.customerEmail || 'Not provided'}\n` +
-                 `Container: ${order.containerNumber}\n` +
-                 `Job ID: ${order.jobId}\n` +
-                 `Ordered by: ${order.purchaserName}\n` +
-                 `${'='.repeat(30)}\n\n` +
-                 `Reply "confirm" to place the order or "cancel" to abort.`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `📋 ORDER SUMMARY\n\n` +
+            `Items:\n${itemsList}\n\n` +
+            `Customer: ${order.customerName}\nPhone: ${order.customerPhone}\nEmail: ${order.customerEmail || 'Not provided'}\nContainer: ${order.containerNumber}\nJob ID: ${order.jobId}\nOrdered by: ${order.purchaserName}`,
+            [
+              { id: "order:confirm", title: "Confirm Order" },
+              { id: "order:abort", title: "Cancel" }
+            ],
+            "Review and confirm"
+          );
+          return "";
         }
         break;
       }
@@ -733,18 +743,20 @@ export class EnhancedWhatsAppService {
           }));
           state.pendingImageProcessing.awaitingProductSelection = true;
           
-          let response = "🎯 I found these possible matches for your image:\n\n";
-          
-          result.matches.slice(0, 5).forEach((match, index) => {
-            const confidencePercent = Math.round(match.confidence * 100);
-            response += `${index + 1}. *${match.productName}*\n` +
-                       `   SKU: ${match.sku}\n` +
-                       `   Confidence: ${confidencePercent}%\n\n`;
-          });
-          
-          response += "Please reply with the number (1-5) of the correct product, or type 'none' if none match.";
-          
-          await this.sendWhatsAppMessage(userPhone, response);
+          const rows = result.matches.slice(0, 10).map((m, idx) => ({
+            id: `product:select:${m.productId}`,
+            title: `${m.productName}`,
+            description: `SKU: ${m.sku} • ${Math.round(m.confidence * 100)}%`
+          }));
+          await this.sendInteractiveList(
+            userPhone,
+            "🎯 I found these possible matches for your image:",
+            rows,
+            "Select",
+            "Matched Products",
+            "Select a product",
+            "If none match, reply 'none'"
+          );
         }
         
       } catch (processingError) {
@@ -783,19 +795,21 @@ export class EnhancedWhatsAppService {
       // Clear image processing state
       state.pendingImageProcessing = undefined;
       
-      // Present product information and action options
+      // Present product information and action options with buttons
       const response = `✅ Product Identified:\n\n` +
                       `📦 *${product.name}*\n` +
                       `SKU: ${product.sku}\n` +
-                      `Current Stock: ${product.stockAvailable || 0} units\n` +
-                      `Total Stock: ${product.stockTotal || 0} units\n\n` +
-                      `What would you like to do?\n` +
-                      `• Type "add [quantity]" to add stock\n` +
-                      `• Type "order [quantity]" to create an order\n` +
-                      `• Type "check" for detailed stock info\n\n` +
-                      `Example: "add 25 units" or "order 10 units"`;
-      
-      await this.sendWhatsAppMessage(userPhone, response);
+                      `Available: ${product.stockAvailable || 0} | Total: ${product.stockTotal || 0}`;
+      await this.sendInteractiveButtons(
+        userPhone,
+        response,
+        [
+          { id: `product:add:${product.id}`, title: "Add Stock" },
+          { id: `product:order:${product.id}`, title: "Create Order" },
+          { id: `product:check:${product.id}`, title: "Check Stock" }
+        ],
+        "Choose an action"
+      );
       
       // Store context for next message
       state.lastContext = {
@@ -930,13 +944,8 @@ export class EnhancedWhatsAppService {
       }
         
       default:
-        return `👋 Welcome to StockSmartHub!\n\n` +
-              `I can help you with:\n` +
-              `1️⃣ Add stock to inventory\n` +
-              `2️⃣ Create an order\n` +
-              `3️⃣ Check stock levels\n` +
-              `📸 Send product images for identification\n\n` +
-              `How can I assist you today?`;
+        await this.sendMainMenu(userPhone);
+        return "";
     }
   }
   
@@ -1041,13 +1050,18 @@ export class EnhancedWhatsAppService {
       
       // We have everything, ask for confirmation
       state.pendingStockAddition.awaitingConfirmation = true;
-      return `📦 Stock Addition Request:\n` +
-             `Product: ${product.name} (SKU: ${product.sku})\n` +
-             `Current stock: ${product.stockAvailable || 0} units\n` +
-             `Adding: ${quantity} units\n` +
-             `New stock will be: ${(product.stockAvailable || 0) + quantity} units\n` +
-             `Added by: ${state.userName}\n\n` +
-             `Reply with "yes" to confirm or "no" to cancel.`;
+      await this.sendInteractiveButtons(
+        userPhone,
+        `📦 Stock Addition Request\n\n` +
+        `Product: ${product.name} (SKU: ${product.sku})\n` +
+        `Current: ${product.stockAvailable || 0} • Add: ${quantity} • New: ${(product.stockAvailable || 0) + quantity}`,
+        [
+          { id: "stock:confirm", title: "Confirm" },
+          { id: "stock:cancel", title: "Cancel" }
+        ],
+        "Confirm Stock Addition"
+      );
+      return "";
       
     } catch (error) {
       console.error('Error initiating stock addition:', error);
@@ -1226,6 +1240,122 @@ export class EnhancedWhatsAppService {
       console.error("Error sending WhatsApp image:", error);
     }
   }
+
+  // Send WhatsApp interactive buttons
+  private async sendInteractiveButtons(
+    to: string,
+    bodyText: string,
+    buttons: Array<{ id: string; title: string }>,
+    headerText?: string,
+    footerText?: string
+  ): Promise<void> {
+    try {
+      const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
+      const payload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          header: headerText ? { type: "text", text: headerText } : undefined,
+          body: { text: this.truncateMessage(bodyText, 1024) },
+          footer: footerText ? { text: footerText } : undefined,
+          action: {
+            buttons: buttons.slice(0, 3).map(b => ({
+              type: "reply",
+              reply: { id: b.id, title: b.title }
+            }))
+          }
+        }
+      } as any;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`WhatsApp API error: ${error}`);
+      }
+    } catch (error) {
+      console.error("Error sending interactive buttons:", error);
+      // Fallback to text
+      await this.sendWhatsAppMessage(to, bodyText + "\n\n(" + buttons.map(b => b.title).join(" | ") + ")");
+    }
+  }
+
+  // Send WhatsApp interactive list
+  private async sendInteractiveList(
+    to: string,
+    bodyText: string,
+    rows: Array<{ id: string; title: string; description?: string }>,
+    listButtonLabel: string = "Select",
+    sectionTitle: string = "Options",
+    headerText?: string,
+    footerText?: string
+  ): Promise<void> {
+    try {
+      const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
+      const payload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          header: headerText ? { type: "text", text: headerText } : undefined,
+          body: { text: this.truncateMessage(bodyText, 1024) },
+          footer: footerText ? { text: footerText } : undefined,
+          action: {
+            button: listButtonLabel,
+            sections: [
+              {
+                title: sectionTitle,
+                rows: rows.slice(0, 10).map(r => ({ id: r.id, title: r.title, description: r.description }))
+              }
+            ]
+          }
+        }
+      } as any;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`WhatsApp API error: ${error}`);
+      }
+    } catch (error) {
+      console.error("Error sending interactive list:", error);
+      // Fallback to text
+      await this.sendWhatsAppMessage(to, bodyText + "\n\n" + rows.map(r => `- ${r.title}`).join('\n'));
+    }
+  }
+
+  // Send Main Menu quick actions
+  private async sendMainMenu(to: string): Promise<void> {
+    await this.sendInteractiveButtons(
+      to,
+      "How can I help you today?",
+      [
+        { id: "main:add_stock", title: "Add Stock" },
+        { id: "main:create_order", title: "Create Order" },
+        { id: "main:check_stock", title: "Check Stock" }
+      ],
+      "StockSmartHub",
+      "Choose an action"
+    );
+  }
   
   // Process incoming webhook
   async processIncomingMessage(messageData: any): Promise<void> {
@@ -1244,17 +1374,30 @@ export class EnhancedWhatsAppService {
       
       // Store message in conversation
       const conversation = await storage.getOrCreateConversation(userPhone);
+      // Compose a readable body for logs
+      const inboundBody = message.type === "text"
+        ? (message.text?.body || "")
+        : message.type === "interactive"
+          ? (
+            message.interactive?.button_reply?.title ||
+            message.interactive?.list_reply?.title ||
+            "[interactive]"
+          )
+          : `[${message.type}]`;
+
       await storage.addWhatsappMessage({
         conversationId: conversation.id,
         direction: "inbound",
         sender: "user",
-        body: message.text?.body || `[${message.type}]`,
+        body: inboundBody,
         meta: message
       });
       
       // Handle message based on type
       if (message.type === "text") {
         await this.handleTextMessage(userPhone, message.text.body);
+      } else if (message.type === "interactive") {
+        await this.handleInteractiveReply(userPhone, message.interactive);
       } else if (message.type === "image") {
         const imageId = message.image?.id;
         if (imageId) {
@@ -1323,6 +1466,153 @@ export class EnhancedWhatsAppService {
       
     } catch (error) {
       console.error("Error processing incoming message:", error);
+    }
+  }
+
+  // Handle interactive replies (buttons and lists)
+  private async handleInteractiveReply(userPhone: string, interactive: any): Promise<void> {
+    try {
+      const state = this.getConversationState(userPhone);
+      const type = interactive?.type;
+      let id = "";
+      let title = "";
+      if (type === "button_reply") {
+        id = interactive.button_reply?.id || "";
+        title = interactive.button_reply?.title || "";
+      } else if (type === "list_reply") {
+        id = interactive.list_reply?.id || "";
+        title = interactive.list_reply?.title || "";
+      }
+
+      if (!id) {
+        console.warn("Interactive reply without id");
+        return;
+      }
+
+      // Main menu actions
+      if (id === "main:add_stock") {
+        state.currentFlow = 'adding_stock';
+        await this.sendWhatsAppMessage(userPhone, "Please type the product name and quantity to add. Example: 'Add 50 units of socket plugs'");
+        return;
+      }
+      if (id === "main:create_order") {
+        state.currentFlow = 'creating_order';
+        await this.sendWhatsAppMessage(userPhone, "What would you like to order? Example: '10 units of socket plugs'");
+        return;
+      }
+      if (id === "main:check_stock") {
+        await this.sendWhatsAppMessage(userPhone, "Please type the product name to check stock. Example: 'Check stock for socket plugs'");
+        return;
+      }
+
+      // Product actions with product id
+      if (id.startsWith("product:add:")) {
+        const productId = id.split(":")[2];
+        state.lastContext = { type: 'product_identified', productId, timestamp: new Date() } as any;
+        await this.sendWhatsAppMessage(userPhone, "Enter quantity to add. Example: 'add 25 units'");
+        return;
+      }
+      if (id.startsWith("product:order:")) {
+        const productId = id.split(":")[2];
+        state.lastContext = { type: 'product_identified', productId, timestamp: new Date() } as any;
+        state.currentFlow = 'creating_order';
+        await this.sendWhatsAppMessage(userPhone, "Enter quantity to order. Example: 'order 10 units'");
+        return;
+      }
+      if (id.startsWith("product:check:")) {
+        const productId = id.split(":")[2];
+        const product = await storage.getProduct(productId);
+        if (product) {
+          await this.sendWhatsAppMessage(userPhone,
+            `📦 ${product.name} (SKU: ${product.sku})\nAvailable: ${product.stockAvailable || 0} | Total: ${product.stockTotal || 0}`);
+        } else {
+          await this.sendWhatsAppMessage(userPhone, "❌ Product not found.");
+        }
+        return;
+      }
+      if (id.startsWith("product:select:")) {
+        const productId = id.split(":")[2];
+        await this.handleProductIdentified(userPhone, productId, state);
+        return;
+      }
+
+      // Stock confirmation
+      if (id === "stock:confirm" || id === "stock:cancel") {
+        if (!state.pendingStockAddition) {
+          await this.sendWhatsAppMessage(userPhone, "No stock addition in progress.");
+          return;
+        }
+        if (id === "stock:cancel") {
+          if (state.awaiting_invoice && state.pendingPurchaseId) {
+            await storage.updatePurchase(state.pendingPurchaseId, { status: 'cancelled' });
+            state.awaiting_invoice = false;
+            state.pendingPurchaseId = undefined;
+          }
+          state.pendingStockAddition = undefined;
+          state.currentFlow = 'idle';
+          await this.sendWhatsAppMessage(userPhone, "❌ Stock addition cancelled. How can I help you?");
+          return;
+        }
+        // Confirm and apply stock addition
+        const { productId, productName, quantity, currentStock } = state.pendingStockAddition;
+        try {
+          const product = await storage.getProduct(productId);
+          if (!product) throw new Error(`Product not found: ${productId}`);
+          const newTotal = (product.stockTotal || 0) + quantity;
+          const newAvailable = (product.stockAvailable || 0) + quantity;
+          await storage.updateProduct(productId, { stockTotal: newTotal, stockAvailable: newAvailable });
+          await storage.createStockMovement({
+            productId,
+            action: "add",
+            quantity,
+            previousStock: currentStock,
+            newStock: newAvailable,
+            reason: `Stock added via WhatsApp by ${state.userName || userPhone}`,
+          });
+          const purchaseItem = { productId, productName, sku: product.sku || '', quantity, unitPrice: 0, total: 0 };
+          const purchase = await storage.createPurchase({
+            userId: state.userPhone,
+            items: [purchaseItem],
+            totalAmount: 0,
+            status: 'pending',
+            notes: `Stock added by ${state.userName || state.userPhone}`
+          });
+          state.awaiting_invoice = true;
+          state.pendingPurchaseId = purchase.id;
+          await storage.createWhatsappLog({ userPhone, productId, action: "stock_added", quantity, aiResponse: `Added ${quantity} units`, status: "processed" });
+          state.pendingStockAddition = undefined;
+          state.currentFlow = 'idle';
+          await this.sendWhatsAppMessage(userPhone,
+            `✅ Stock updated for ${productName}. New available: ${newAvailable}. Please send the invoice image to confirm.`);
+        } catch (err: any) {
+          await this.sendWhatsAppMessage(userPhone, `❌ Failed to update stock: ${(err as Error).message}`);
+        }
+        return;
+      }
+
+      // Backorder choice during order creation
+      if (id === "order:available" || id === "order:backorder" || id === "order:cancel") {
+        const choice = id === "order:available" ? "1" : id === "order:backorder" ? "2" : "3";
+        const response = await this.handleOrderCreation(userPhone, choice, state);
+        if (response && response.trim()) {
+          await this.sendWhatsAppMessage(userPhone, response);
+        }
+        return;
+      }
+
+      // Order confirmation
+      if (id === "order:confirm" || id === "order:abort") {
+        const response = await this.handleOrderCreation(userPhone, id === "order:confirm" ? "confirm" : "cancel", state);
+        if (response && response.trim()) {
+          await this.sendWhatsAppMessage(userPhone, response);
+        }
+        return;
+      }
+
+      // Fallback
+      console.log("Unhandled interactive id:", id, title);
+    } catch (error) {
+      console.error("Error handling interactive reply:", error);
     }
   }
   
