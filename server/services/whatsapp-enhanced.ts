@@ -80,6 +80,7 @@ export class EnhancedWhatsAppService {
   private graphVersion: string;
   private conversations: Map<string, ConversationState> = new Map();
   private uploadDir: string;
+  private lastSendAtByRecipient: Map<string, number> = new Map();
 
   constructor() {
     this.webhookToken = process.env.WHATSAPP_WEBHOOK_TOKEN || "";
@@ -1229,6 +1230,78 @@ export class EnhancedWhatsAppService {
     return text.substring(0, breakPoint) + '\n\n... (message truncated for length)';
   }
 
+  // Small utility sleep
+  private async sleep(ms: number): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Core sender with timeout, retry, and light rate limiting per recipient
+  private async postToWhatsApp(
+    payload: any,
+    purpose: string,
+    to: string,
+    options: { timeoutMs?: number; maxRetries?: number } = {}
+  ): Promise<void> {
+    const timeoutMs = options.timeoutMs ?? 10000;
+    const maxRetries = options.maxRetries ?? 3;
+
+    if (!this.accessToken || !this.phoneNumberId) {
+      console.error(`[WA] Missing credentials; cannot send ${purpose}`);
+      return;
+    }
+
+    const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
+
+    // Light per-recipient pacing (avoid sending bursts)
+    const last = this.lastSendAtByRecipient.get(to) || 0;
+    const since = Date.now() - last;
+    if (since < 350) {
+      await this.sleep(350 - since);
+    }
+
+    let attempt = 0;
+    while (attempt <= maxRetries) {
+      attempt++;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (res.ok) {
+          this.lastSendAtByRecipient.set(to, Date.now());
+          return;
+        }
+
+        const text = await res.text();
+        const retriable = res.status >= 500 || res.status === 429;
+        console.warn(`[WA] Send failed (status ${res.status}) for ${purpose}: ${text}${retriable && attempt <= maxRetries ? ` — retrying (${attempt}/${maxRetries})` : ''}`);
+        if (!retriable || attempt > maxRetries) {
+          return;
+        }
+      } catch (err: any) {
+        clearTimeout(timer);
+        const isAbort = err?.name === 'AbortError';
+        console.warn(`[WA] ${isAbort ? 'Timeout' : 'Network'} error for ${purpose}${attempt <= maxRetries ? ` — retrying (${attempt}/${maxRetries})` : ''}`, err?.message || err);
+        if (attempt > maxRetries) {
+          return;
+        }
+      }
+
+      // Exponential backoff with jitter
+      const backoff = Math.min(2000, 300 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 150);
+      await this.sleep(backoff);
+    }
+  }
+
   // Send WhatsApp message
   async sendWhatsAppMessage(to: string, text: string): Promise<void> {
     try {
@@ -1238,61 +1311,31 @@ export class EnhancedWhatsAppService {
         console.warn(`Skipping empty message to ${to}`);
         return;
       }
-      
-      const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: to,
-          type: "text",
-          text: { body: truncatedText }
-        })
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`WhatsApp API error: ${error}`);
-      }
-      
-      console.log(`Message sent to ${to}`);
+      const payload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: truncatedText }
+      } as const;
+
+      await this.postToWhatsApp(payload, 'text', to);
     } catch (error) {
       console.error("Error sending WhatsApp message:", error);
-      throw error;
+      // Swallow to avoid cascading failures in flows; already logged
     }
   }
   
   // Send WhatsApp image
   private async sendWhatsAppImage(to: string, imageUrl: string, caption?: string): Promise<void> {
     try {
-      const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to,
-          type: "image",
-          image: { link: imageUrl },
-          caption: caption || ''
-        })
-      });
-      
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`WhatsApp API error: ${error}`);
-      }
-      
-      console.log(`Image sent to ${to}`);
+      const payload = {
+        messaging_product: "whatsapp",
+        to,
+        type: "image",
+        image: { link: imageUrl },
+        caption: caption || ''
+      } as const;
+      await this.postToWhatsApp(payload, 'image', to);
     } catch (error: any) {
       console.error("Error sending WhatsApp image:", error);
     }
@@ -1307,7 +1350,6 @@ export class EnhancedWhatsAppService {
     footerText?: string
   ): Promise<void> {
     try {
-      const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
       const payload = {
         messaging_product: "whatsapp",
         to,
@@ -1325,20 +1367,7 @@ export class EnhancedWhatsAppService {
           }
         }
       } as any;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`WhatsApp API error: ${error}`);
-      }
+      await this.postToWhatsApp(payload, 'interactive_buttons', to);
     } catch (error) {
       console.error("Error sending interactive buttons:", error);
       // Fallback to text
@@ -1357,7 +1386,6 @@ export class EnhancedWhatsAppService {
     footerText?: string
   ): Promise<void> {
     try {
-      const url = `https://graph.facebook.com/${this.graphVersion}/${this.phoneNumberId}/messages`;
       const payload = {
         messaging_product: "whatsapp",
         to,
@@ -1378,20 +1406,7 @@ export class EnhancedWhatsAppService {
           }
         }
       } as any;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`WhatsApp API error: ${error}`);
-      }
+      await this.postToWhatsApp(payload, 'interactive_list', to);
     } catch (error) {
       console.error("Error sending interactive list:", error);
       // Fallback to text
