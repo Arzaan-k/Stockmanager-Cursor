@@ -21,6 +21,8 @@ interface ConversationState {
     currentStock: number;
     awaitingConfirmation: boolean;
     awaitingQuantity?: boolean;
+    awaitingProductSelection?: boolean;
+    candidates?: Array<{ productId: string; productName: string; sku: string }>
   };
   
   // For image-based product identification
@@ -330,6 +332,24 @@ export class EnhancedWhatsAppService {
       }
     }
     
+    // If awaiting product selection from typed query
+    if (state.pendingStockAddition?.awaitingProductSelection && state.pendingStockAddition.candidates?.length) {
+      const choiceIdx = parseInt(message.trim(), 10);
+      if (!isNaN(choiceIdx) && choiceIdx >= 1 && choiceIdx <= state.pendingStockAddition.candidates.length) {
+        const selected = state.pendingStockAddition.candidates[choiceIdx - 1];
+        const selectedProduct = await storage.getProduct(selected.productId);
+        if (selectedProduct) {
+          state.pendingStockAddition.productId = selectedProduct.id;
+          state.pendingStockAddition.productName = selectedProduct.name;
+          state.pendingStockAddition.sku = selectedProduct.sku || '';
+          state.pendingStockAddition.currentStock = selectedProduct.stockAvailable || 0;
+          state.pendingStockAddition.awaitingProductSelection = false;
+        }
+      } else {
+        return `Please reply with a number between 1 and ${state.pendingStockAddition.candidates.length}.`;
+      }
+    }
+
     // Extract product and quantity from message
     const { productName, quantity, product } = await this.extractProductAndQuantity(message);
     
@@ -340,6 +360,29 @@ export class EnhancedWhatsAppService {
              `Example: "Add 50 units of socket plugs"`;
     }
     
+    // If user typed a brand or partial like "daikin", show candidate list to select exact product
+    if (!product && productName) {
+      const candidates = await storage.searchProductsFuzzy(productName);
+      if (candidates && candidates.length > 1) {
+        const top = candidates.slice(0, 10);
+        state.pendingStockAddition = {
+          productId: '',
+          productName: productName,
+          sku: '',
+          quantity: quantity || 0,
+          currentStock: 0,
+          awaitingConfirmation: false,
+          awaitingQuantity: !quantity,
+          awaitingProductSelection: true,
+          candidates: top.map(p => ({ productId: p.id, productName: p.name, sku: p.sku }))
+        };
+
+        const rows = top.map((p, idx) => ({ id: `product:select:${p.id}`, title: `${idx + 1}. ${p.name}`, description: `SKU: ${p.sku}` }));
+        await this.sendInteractiveList(userPhone, `I found multiple matches for "${productName}". Please select one:`, rows, "Select", "Matches");
+        return "";
+      }
+    }
+
     // Set up pending stock addition
     state.pendingStockAddition = {
       productId: product?.id || '',
@@ -1650,6 +1693,20 @@ export class EnhancedWhatsAppService {
       }
       if (id.startsWith("product:select:")) {
         const productId = id.split(":")[2];
+        if (state.pendingStockAddition?.awaitingProductSelection) {
+          const selected = await storage.getProduct(productId);
+          if (selected) {
+            state.pendingStockAddition.productId = selected.id;
+            state.pendingStockAddition.productName = selected.name;
+            state.pendingStockAddition.sku = selected.sku || '';
+            state.pendingStockAddition.currentStock = selected.stockAvailable || 0;
+            state.pendingStockAddition.awaitingProductSelection = false;
+            if (state.pendingStockAddition.awaitingQuantity) {
+              await this.sendWhatsAppMessage(userPhone, `How many units of ${selected.name} should I add?`);
+              return;
+            }
+          }
+        }
         await this.handleProductIdentified(userPhone, productId, state);
         return;
       }
