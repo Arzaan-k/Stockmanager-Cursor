@@ -20,6 +20,7 @@ interface ConversationState {
     quantity: number;
     currentStock: number;
     awaitingConfirmation: boolean;
+    awaitingQuantity?: boolean;
   };
   
   // For image-based product identification
@@ -187,6 +188,22 @@ export class EnhancedWhatsAppService {
 
   // Handle stock addition flow
   private async handleStockAddition(userPhone: string, message: string, state: ConversationState): Promise<string> {
+    // If we're waiting for a quantity, lock product and parse number only
+    if (state.currentFlow === 'adding_stock' && state.pendingStockAddition?.awaitingQuantity) {
+      const qtyMatch = message.match(/(\d+)/);
+      const qty = qtyMatch ? Math.abs(parseInt(qtyMatch[1])) : undefined;
+      if (!qty || qty <= 0) {
+        return `Please enter a valid number for quantity to add for ${state.pendingStockAddition.productName}.`;
+      }
+      state.pendingStockAddition.quantity = qty;
+      state.pendingStockAddition.awaitingQuantity = false;
+      state.pendingStockAddition.awaitingConfirmation = true;
+      const { productName, sku, currentStock } = state.pendingStockAddition;
+      return `📦 Stock Addition Request:\n` +
+             `Product: ${productName} (SKU: ${sku})\n` +
+             `Current: ${currentStock} • Add: ${qty} • New: ${currentStock + qty}` +
+             `\n\nReply with "yes" to confirm or "no" to cancel.`;
+    }
     // Check if we're awaiting user name
     if (state.currentFlow === 'awaiting_name' && state.pendingStockAddition) {
       state.userName = message.trim();
@@ -330,12 +347,14 @@ export class EnhancedWhatsAppService {
       sku: product?.sku || '',
       quantity: quantity || 0,
       currentStock: product?.stockAvailable || 0,
-      awaitingConfirmation: false
+      awaitingConfirmation: false,
+      awaitingQuantity: !quantity
     };
     
     // If quantity missing but we have a product, prompt for quantity
-    if ((state.pendingStockAddition.quantity || 0) <= 0) {
+    if (state.pendingStockAddition.awaitingQuantity) {
       await this.sendWhatsAppMessage(userPhone, `How many units of ${state.pendingStockAddition.productName} should I add?`);
+      // Keep flow in adding_stock and do not re-run extraction next turn
       return "";
     }
 
@@ -1424,6 +1443,9 @@ export class EnhancedWhatsAppService {
 
   // Send Main Menu quick actions
   private async sendMainMenu(to: string): Promise<void> {
+    const products = await storage.getProducts({});
+    const topProducts = products.slice(0, 3);
+    const productButtons = topProducts.map(p => ({ id: `product:check:${p.id}`, title: p.name.substring(0, 20) }));
     await this.sendInteractiveButtons(
       to,
       "How can I help you today?",
@@ -1435,6 +1457,15 @@ export class EnhancedWhatsAppService {
       "StockSmartHub",
       "Choose an action"
     );
+    if (productButtons.length > 0) {
+      await this.sendInteractiveButtons(
+        to,
+        "Quick products",
+        productButtons,
+        "Popular",
+        "Tap to view"
+      );
+    }
   }
   
   // Process incoming webhook
@@ -1581,7 +1612,14 @@ export class EnhancedWhatsAppService {
         return;
       }
       if (id === "main:check_stock") {
-        await this.sendWhatsAppMessage(userPhone, "Please type the product name to check stock. Example: 'Check stock for socket plugs'");
+        // Offer quick product list to check
+        const products = await storage.getProducts({});
+        const rows = products.slice(0, 10).map(p => ({ id: `product:check:${p.id}`, title: p.name, description: `SKU: ${p.sku}` }));
+        if (rows.length) {
+          await this.sendInteractiveList(userPhone, "Choose a product to view stock:", rows, "Select", "Products");
+        } else {
+          await this.sendWhatsAppMessage(userPhone, "No products found.");
+        }
         return;
       }
 
