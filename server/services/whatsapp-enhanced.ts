@@ -243,8 +243,10 @@ export class EnhancedWhatsAppService {
             total: 0,
           };
           
+          // Ensure a valid user exists for purchases FK
+          const waUser = await storage.getOrCreateUserByPhone(state.userPhone);
           const purchase = await storage.createPurchase({
-            userId: state.userPhone,
+            userId: waUser.id,
             items: [purchaseItem],
             totalAmount: 0,
             status: 'pending',
@@ -331,6 +333,12 @@ export class EnhancedWhatsAppService {
       awaitingConfirmation: false
     };
     
+    // If quantity missing but we have a product, prompt for quantity
+    if ((state.pendingStockAddition.quantity || 0) <= 0) {
+      await this.sendWhatsAppMessage(userPhone, `How many units of ${state.pendingStockAddition.productName} should I add?`);
+      return "";
+    }
+
     // Check if we have user name
     if (!state.userName) {
       state.currentFlow = 'awaiting_name';
@@ -1670,8 +1678,9 @@ export class EnhancedWhatsAppService {
             reason: `Stock added via WhatsApp by ${state.userName || userPhone}`,
           });
           const purchaseItem = { productId, productName, sku: product.sku || '', quantity, unitPrice: 0, total: 0 };
+          const waUser = await storage.getOrCreateUserByPhone(state.userPhone);
           const purchase = await storage.createPurchase({
-            userId: state.userPhone,
+            userId: waUser.id,
             items: [purchaseItem],
             totalAmount: 0,
             status: 'pending',

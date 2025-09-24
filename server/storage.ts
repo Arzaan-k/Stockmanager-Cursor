@@ -29,6 +29,8 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getOrCreateUserByPhone(phone: string): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User>;
 
@@ -136,6 +138,33 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user || undefined;
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phone, phone));
+    return user || undefined;
+  }
+
+  async getOrCreateUserByPhone(phone: string): Promise<User> {
+    const existing = await this.getUserByPhone(phone);
+    if (existing) return existing;
+    const safe = (s: string) => s.replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const username = `wa_${safe(phone)}`.slice(0, 32) || `wa_${Date.now()}`;
+    const email = `${safe(phone)}@wa.local`;
+    const [user] = await db
+      .insert(users)
+      .values({
+        username,
+        email,
+        password: 'whatsapp',
+        role: 'staff',
+        phone,
+        firstName: 'WhatsApp',
+        lastName: 'User',
+        isActive: true,
+      })
+      .returning();
+    return user;
   }
 
   async requestApproval(orderId: string, requestedBy?: string, notes?: string): Promise<Order> {
