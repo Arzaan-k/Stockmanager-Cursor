@@ -487,13 +487,30 @@ export class EnhancedWhatsAppService {
             `${i + 1}. ${item.productName} - ${item.quantity} units`
           ).join('\n');
           
-          return `✅ Added to order:\n${product.name} - ${quantity} units\n\n` +
-                 `📋 Current order:\n${itemsList}\n\n` +
-                 `Add more items or type "done" to proceed with checkout.`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `✅ Added to order\n\n${product.name} - ${quantity} units\n\n📋 Current order:\n${itemsList}`,
+            [
+              { id: "order:add_more", title: "Add More" },
+              { id: "order:proceed", title: "Proceed" },
+              { id: "order:cancel", title: "Cancel Order" }
+            ],
+            "Order actions"
+          );
+          return "";
         }
         
-        return `Please specify the product and quantity.\n` +
-               `Example: "50 units of socket plugs"`;
+        await this.sendInteractiveButtons(
+          userPhone,
+          `Add items to your order.`,
+          [
+            { id: "main:check_stock", title: "Check Stock" },
+            { id: "main:add_stock", title: "Add Stock" },
+            { id: "main:create_order", title: "Create Order" }
+          ],
+          "Need help?"
+        );
+        return "";
       }
       
       case 'collecting_customer_info': {
@@ -501,15 +518,24 @@ export class EnhancedWhatsAppService {
         if (order.currentQuestion === 'customer_name') {
           order.customerName = message.trim();
           order.currentQuestion = 'customer_phone';
-          return `Customer name: ${order.customerName}\n\n` +
-                 `Please provide the customer's phone number:`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `Customer name: ${order.customerName}\nPlease provide the customer's phone number:`,
+            [ { id: "order:cancel", title: "Cancel" } ]
+          );
+          return "";
         }
         
         if (order.currentQuestion === 'customer_phone') {
           order.customerPhone = message.trim();
           order.currentQuestion = 'customer_email';
-          return `Phone: ${order.customerPhone}\n\n` +
-                 `Please provide the customer's email (or type "skip"):`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `Phone: ${order.customerPhone}\nProvide customer's email?`,
+            [ { id: "cust:skip_email", title: "Skip Email" }, { id: "order:cancel", title: "Cancel" } ],
+            "Customer info"
+          );
+          return "";
         }
         
         if (order.currentQuestion === 'customer_email') {
@@ -517,21 +543,34 @@ export class EnhancedWhatsAppService {
             order.customerEmail = message.trim();
           }
           order.currentQuestion = 'container_number';
-          return `Please provide the container number:`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `Please provide the container number:`,
+            [ { id: "order:cancel", title: "Cancel" } ]
+          );
+          return "";
         }
         
         if (order.currentQuestion === 'container_number') {
           order.containerNumber = message.trim();
           order.currentQuestion = 'job_id';
-          return `Container: ${order.containerNumber}\n\n` +
-                 `Please provide the job ID:`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `Container: ${order.containerNumber}\nProvide the job ID:`,
+            [ { id: "order:cancel", title: "Cancel" } ]
+          );
+          return "";
         }
         
         if (order.currentQuestion === 'job_id') {
           order.jobId = message.trim();
           order.currentQuestion = 'purchaser_name';
-          return `Job ID: ${order.jobId}\n\n` +
-                 `Please provide your name (person placing this order):`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `Job ID: ${order.jobId}\nYour name (person placing the order):`,
+            [ { id: "order:cancel", title: "Cancel" } ]
+          );
+          return "";
         }
         
         if (order.currentQuestion === 'purchaser_name') {
@@ -915,6 +954,11 @@ export class EnhancedWhatsAppService {
   
   // Handle intent-based messages
   private async handleIntentBasedMessage(userPhone: string, message: string, state: ConversationState, intent: string): Promise<string> {
+    const normalized = message.trim().toLowerCase();
+    if (normalized === 'menu' || normalized === 'help' || normalized === 'start') {
+      await this.sendMainMenu(userPhone);
+      return "";
+    }
     switch (intent) {
       case 'add_stock':
         state.currentFlow = 'adding_stock';
@@ -930,16 +974,20 @@ export class EnhancedWhatsAppService {
       case 'check_stock': {
         const { product } = await this.extractProductAndQuantity(message);
         if (product) {
-          return `📦 Stock Information:\n` +
-                `Product: ${product.name}\n` +
-                `SKU: ${product.sku}\n` +
-                `Available: ${product.stockAvailable || 0} units\n` +
-                `Total: ${product.stockTotal || 0} units\n` +
-                `Reserved: ${product.stockUsed || 0} units\n\n` +
-                `What would you like to do?`;
+          await this.sendInteractiveButtons(
+            userPhone,
+            `📦 ${product.name} (SKU: ${product.sku})\nAvailable: ${product.stockAvailable || 0} • Total: ${product.stockTotal || 0} • Used: ${product.stockUsed || 0}`,
+            [
+              { id: `product:add:${product.id}`, title: "Add Stock" },
+              { id: `product:order:${product.id}`, title: "Create Order" },
+              { id: `product:check:${product.id}`, title: "More Info" }
+            ],
+            "Stock info"
+          );
+          return "";
         } else {
-          return `Please specify which product you want to check.\n` +
-                `Example: "Check stock for socket plugs"`;
+          await this.sendMainMenu(userPhone);
+          return "";
         }
       }
         
@@ -1008,12 +1056,21 @@ export class EnhancedWhatsAppService {
       }
     }
     
-    // If no specific command recognized, keep context and ask for clarification
-    return `I can help you with this product (*${state.lastContext.productName}*):\n` +
-           `• Type "add [quantity]" to add stock\n` +
-           `• Type "order [quantity]" to create an order\n` +
-           `• Type "check" for detailed stock info\n\n` +
-           `What would you like to do?`;
+    // If no specific command recognized, show action buttons
+    const product = await storage.getProduct(productId);
+    if (product) {
+      await this.sendInteractiveButtons(
+        userPhone,
+        `For *${product.name}* (SKU: ${product.sku}) choose an action:`,
+        [
+          { id: `product:add:${product.id}`, title: "Add Stock" },
+          { id: `product:order:${product.id}`, title: "Create Order" },
+          { id: `product:check:${product.id}`, title: "Check Stock" }
+        ]
+      );
+      return "";
+    }
+    return `What would you like to do with this product?`;
   }
   
   // Helper method to initiate stock addition for identified product
@@ -1534,6 +1591,34 @@ export class EnhancedWhatsAppService {
         const productId = id.split(":")[2];
         await this.handleProductIdentified(userPhone, productId, state);
         return;
+      }
+
+      // Order step helpers
+      if (id === "order:add_more") {
+        state.pendingOrder = state.pendingOrder || { items: [], step: 'collecting_items' } as any;
+        state.pendingOrder.step = 'collecting_items';
+        await this.sendWhatsAppMessage(userPhone, "Add another item. Example: '5 units of bolts'");
+        return;
+      }
+      if (id === "order:proceed") {
+        const response = await this.handleOrderCreation(userPhone, "proceed", state);
+        if (response && response.trim()) await this.sendWhatsAppMessage(userPhone, response);
+        return;
+      }
+      if (id === "cust:skip_email") {
+        if (state.pendingOrder && state.pendingOrder.currentQuestion === 'customer_email') {
+          const response = await this.handleOrderCreation(userPhone, "skip", state);
+          if (response && response.trim()) await this.sendWhatsAppMessage(userPhone, response);
+          return;
+        }
+      }
+      if (id === "order:cancel") {
+        if (state.pendingOrder) {
+          state.pendingOrder = undefined;
+          state.currentFlow = 'idle';
+          await this.sendWhatsAppMessage(userPhone, "❌ Order cancelled. How can I help you?");
+          return;
+        }
       }
 
       // Stock confirmation
