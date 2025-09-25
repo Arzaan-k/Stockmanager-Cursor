@@ -203,7 +203,9 @@ export class EnhancedWhatsAppService {
       hasPendingStockAddition: !!state.pendingStockAddition,
       awaitingQuantity: state.pendingStockAddition?.awaitingQuantity,
       awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
-      message: message
+      userName: state.userName,
+      message: message,
+      pendingStockAddition: state.pendingStockAddition
     });
     
     // If we're waiting for a quantity, lock product and parse number only
@@ -1259,7 +1261,9 @@ export class EnhancedWhatsAppService {
         currentFlow: state.currentFlow,
         hasPendingStockAddition: !!state.pendingStockAddition,
         awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
-        lastContextType: state.lastContext?.type
+        userName: state.userName,
+        lastContextType: state.lastContext?.type,
+        pendingOrder: !!state.pendingOrder
       });
       
       // Check if this is a product selection button click
@@ -1274,7 +1278,12 @@ export class EnhancedWhatsAppService {
       else if (state.pendingStockAddition || 
                state.currentFlow === 'awaiting_name' || 
                state.currentFlow === 'adding_stock') {
-        console.log('Processing as stock addition flow');
+        console.log('Processing as stock addition flow - state:', {
+          pendingStockAddition: !!state.pendingStockAddition,
+          currentFlow: state.currentFlow,
+          awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
+          userName: state.userName
+        });
         response = await this.handleStockAddition(userPhone, message, state);
       } else if (state.currentFlow === 'creating_order' || 
                  state.currentFlow === 'collecting_order_details' ||
@@ -1815,8 +1824,9 @@ export class EnhancedWhatsAppService {
     action: string
   ): Promise<void> {
     try {
-      // Create buttons for each product (max 5 for WhatsApp)
-      const buttons = products.slice(0, 5).map((product, index) => {
+      // Create buttons for top 3 most relevant products
+      const topProducts = products.slice(0, 3);
+      const buttons = topProducts.map((product, index) => {
         const buttonId = `select_product_${product.id}_${action}_${quantity}`;
         console.log(`Creating button ${index + 1}:`, {
           productId: product.id,
@@ -1831,9 +1841,9 @@ export class EnhancedWhatsAppService {
         };
       });
 
-      const bodyText = `Found ${products.length} products. Please select the correct one:\n\n${products.map((p, i) => 
+      const bodyText = `Found ${products.length} products. Please select the correct one:\n\n${topProducts.map((p, i) => 
         `${i + 1}. ${p.name} (SKU: ${p.sku}) - Stock: ${p.stockAvailable}`
-      ).join('\n')}`;
+      ).join('\n')}${products.length > 3 ? `\n\n... and ${products.length - 3} more products` : ''}`;
 
       console.log('Sending buttons:', buttons);
       await this.sendInteractiveButtons(
@@ -1846,9 +1856,9 @@ export class EnhancedWhatsAppService {
     } catch (error) {
       console.error("Error sending product selection buttons:", error);
       // Fallback to text message
-      const textMessage = `Found ${products.length} products. Please reply with the number:\n\n${products.map((p, i) => 
+      const textMessage = `Found ${products.length} products. Please reply with the number:\n\n${products.slice(0, 3).map((p, i) => 
         `${i + 1}. ${p.name} (SKU: ${p.sku}) - Stock: ${p.stockAvailable}`
-      ).join('\n')}\n\nReply with the number (1-${Math.min(products.length, 5)}) to select.`;
+      ).join('\n')}\n\nReply with the number (1-3) to select.`;
       await this.sendWhatsAppMessage(to, textMessage);
     }
   }
@@ -2053,7 +2063,11 @@ export class EnhancedWhatsAppService {
       if (id === "main:check_stock") {
         // Offer quick product list to check
         const products = await storage.getProducts({});
-        const rows = products.slice(0, 10).map(p => ({ id: `product:check:${p.id}`, title: p.name, description: `SKU: ${p.sku}` }));
+        const rows = products.slice(0, 10).map(p => ({ 
+          id: `product:check:${p.id}`, 
+          title: p.name.length > 24 ? p.name.substring(0, 21) + '...' : p.name, 
+          description: `SKU: ${p.sku}` 
+        }));
         if (rows.length) {
           await this.sendInteractiveList(userPhone, "Choose a product to view stock:", rows, "Select", "Products");
         } else {
