@@ -148,6 +148,7 @@ export class EnhancedWhatsAppService {
     productName?: string;
     quantity?: number;
     product?: any;
+    products?: any[];
   }> {
     // Extract quantity
     const quantityMatch = message.match(/(\d+)\s*(units?|pieces?|pcs?|nos?\.?)/i);
@@ -166,26 +167,33 @@ export class EnhancedWhatsAppService {
     
     // Search for product in database
     let product = undefined;
+    let products = [];
     if (productName && productName.length > 0) {
       // First try exact search
-      const products = await storage.searchProducts(productName);
-      if (products.length > 0) {
-        // If multiple products found, try to find best match
-        const exactMatch = products.find(p => 
-          p.name.toLowerCase() === productName.toLowerCase() ||
-          p.name.toLowerCase().includes(productName.toLowerCase())
-        );
-        product = exactMatch || products[0];
-      } else {
-        // Try fuzzy search
-        const fuzzyProducts = await storage.searchProductsFuzzy(productName);
-        if (fuzzyProducts.length > 0) {
-          product = fuzzyProducts[0];
+      const exactProducts = await storage.searchProducts(productName);
+      // Then try fuzzy search
+      const fuzzyProducts = await storage.searchProductsFuzzy(productName);
+      
+      // Combine and deduplicate results
+      const allProducts = [...exactProducts];
+      fuzzyProducts.forEach(fp => {
+        if (!allProducts.find(p => p.id === fp.id)) {
+          allProducts.push(fp);
+        }
+      });
+      
+      if (allProducts.length > 0) {
+        if (allProducts.length === 1) {
+          // Single product found
+          product = allProducts[0];
+        } else {
+          // Multiple products found - return all for selection
+          products = allProducts.slice(0, 5); // Limit to 5 for buttons
         }
       }
     }
     
-    return { productName, quantity, product };
+    return { productName, quantity, product, products };
   }
 
   // Handle stock addition flow
@@ -351,17 +359,33 @@ export class EnhancedWhatsAppService {
     }
 
     // Extract product and quantity from message
-    const { productName, quantity, product } = await this.extractProductAndQuantity(message);
+    const { productName, quantity, product, products } = await this.extractProductAndQuantity(message);
     
-    if (!product && !productName) {
+    if (!product && !productName && !products?.length) {
       return `❓ I couldn't understand your request. Please specify:\n` +
              `- Product name or SKU\n` +
              `- Quantity to add\n\n` +
              `Example: "Add 50 units of socket plugs"`;
     }
     
+    // If multiple products found, show selection buttons
+    if (products && products.length > 1) {
+      // Store the context for product selection
+      state.lastContext = {
+        type: 'product_selection',
+        productQuery: productName,
+        quantity: quantity || 1,
+        action: 'add_stock',
+        products: products
+      };
+
+      // Send product selection buttons
+      await this.sendProductSelectionButtons(userPhone, products, quantity || 1, 'add_stock');
+      return "";
+    }
+    
     // If user typed a brand or partial like "daikin", show candidate list to select exact product
-    if (!product && productName) {
+    if (!product && productName && !products?.length) {
       const candidates = await storage.searchProductsFuzzy(productName);
       if (candidates && candidates.length > 1) {
         const top = candidates.slice(0, 5); // Limit to 5 for buttons
