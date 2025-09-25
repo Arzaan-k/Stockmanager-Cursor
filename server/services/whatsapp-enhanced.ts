@@ -560,7 +560,12 @@ export class EnhancedWhatsAppService {
       }
       
       case 'collecting_items': {
-        console.log('Processing collecting_items step:', { message, orderItems: order.items.length });
+        console.log('Processing collecting_items step:', { 
+          message, 
+          orderItems: order.items.length, 
+          currentFlow: state.currentFlow,
+          hasPendingOrder: !!state.pendingOrder 
+        });
         
         // Check if user wants to proceed with collected items
         if (order.items.length > 0 && /^(yes|y|done|proceed|next)$/i.test(message.trim())) {
@@ -1137,11 +1142,31 @@ export class EnhancedWhatsAppService {
       // Proceed with order creation
       state.currentFlow = 'creating_order';
       state.pendingOrder = {
-        items: [{ productId, quantity, confirmed: false }],
+        items: [{
+          productId,
+          productName: product.name,
+          sku: product.sku || 'NA',
+          quantity,
+          unitPrice: product.price
+        }],
         step: 'collecting_items'
       };
       
-      return `Selected: ${product.name} (SKU: ${product.sku})\nQuantity: ${quantity} units\nPlease tell me your name to proceed with the order:`;
+      const itemsList = state.pendingOrder.items.map((item, i) => 
+        `${i + 1}. ${item.productName} - ${item.quantity} units`
+      ).join('\n');
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        `✅ Added to order\n\n${product.name} - ${quantity} units\n\n📋 Current order:\n${itemsList}`,
+        [
+          { id: "order:add_more", title: "Add More" },
+          { id: "order:proceed", title: "Proceed" },
+          { id: "order:cancel", title: "Cancel Order" }
+        ],
+        "Order actions"
+      );
+      return "";
     }
 
     console.log('Unsupported action:', action);
@@ -1188,11 +1213,31 @@ export class EnhancedWhatsAppService {
       // Proceed with order creation
       state.currentFlow = 'creating_order';
       state.pendingOrder = {
-        items: [{ productId: selectedProduct.id, quantity, confirmed: false }],
+        items: [{
+          productId: selectedProduct.id,
+          productName: selectedProduct.name,
+          sku: selectedProduct.sku || 'NA',
+          quantity,
+          unitPrice: selectedProduct.price
+        }],
         step: 'collecting_items'
       };
       
-      return `Selected: ${selectedProduct.name} (SKU: ${selectedProduct.sku})\nQuantity: ${quantity} units\nPlease tell me your name to proceed with the order:`;
+      const itemsList = state.pendingOrder.items.map((item, i) => 
+        `${i + 1}. ${item.productName} - ${item.quantity} units`
+      ).join('\n');
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        `✅ Added to order\n\n${selectedProduct.name} - ${quantity} units\n\n📋 Current order:\n${itemsList}`,
+        [
+          { id: "order:add_more", title: "Add More" },
+          { id: "order:proceed", title: "Proceed" },
+          { id: "order:cancel", title: "Cancel Order" }
+        ],
+        "Order actions"
+      );
+      return "";
     }
 
     return "Action not supported. Please try again.";
