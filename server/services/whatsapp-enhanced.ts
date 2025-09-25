@@ -984,18 +984,27 @@ export class EnhancedWhatsAppService {
 
   // Handle product selection button click
   private async handleProductSelectionButton(userPhone: string, buttonId: string, state: ConversationState): Promise<string> {
+    console.log('Processing button click:', buttonId);
+    
     // Parse button ID: select_product_{productId}_{action}_{quantity}
     const parts = buttonId.split('_');
+    console.log('Button ID parts:', parts);
+    
     if (parts.length < 5) {
+      console.log('Invalid button ID format, parts length:', parts.length);
       return "Invalid selection. Please try again.";
     }
 
     const productId = parts[2];
     const action = parts[3];
     const quantity = parseInt(parts[4]);
+    
+    console.log('Parsed values:', { productId, action, quantity });
 
     // Get the product details
     const product = await storage.getProduct(productId);
+    console.log('Product found:', product ? product.name : 'Not found');
+    
     if (!product) {
       return "Product not found. Please try again.";
     }
@@ -1004,6 +1013,7 @@ export class EnhancedWhatsAppService {
     state.lastContext = undefined;
 
     if (action === 'add_stock') {
+      console.log('Processing add_stock action');
       // Proceed with stock addition
       state.currentFlow = 'adding_stock';
       state.pendingStockAddition = {
@@ -1018,6 +1028,7 @@ export class EnhancedWhatsAppService {
       
       return `Selected: ${product.name} (SKU: ${product.sku})\nCurrent stock: ${product.stockAvailable} units\nYou want to add: ${quantity} units\nPlease tell me your name for the record:`;
     } else if (action === 'create_order') {
+      console.log('Processing create_order action');
       // Proceed with order creation
       state.currentFlow = 'creating_order';
       state.pendingOrder = {
@@ -1028,6 +1039,7 @@ export class EnhancedWhatsAppService {
       return `Selected: ${product.name} (SKU: ${product.sku})\nQuantity: ${quantity} units\nPlease tell me your name to proceed with the order:`;
     }
 
+    console.log('Unsupported action:', action);
     return "Action not supported. Please try again.";
   }
 
@@ -1599,15 +1611,26 @@ export class EnhancedWhatsAppService {
   ): Promise<void> {
     try {
       // Create buttons for each product (max 3 for WhatsApp)
-      const buttons = products.slice(0, 3).map((product, index) => ({
-        id: `select_product_${product.id}_${action}_${quantity}`,
-        title: `${product.name.substring(0, 15)}...` // Truncate for button display
-      }));
+      const buttons = products.slice(0, 3).map((product, index) => {
+        const buttonId = `select_product_${product.id}_${action}_${quantity}`;
+        console.log(`Creating button ${index + 1}:`, {
+          productId: product.id,
+          productName: product.name,
+          action,
+          quantity,
+          buttonId
+        });
+        return {
+          id: buttonId,
+          title: `${product.name.substring(0, 15)}...` // Truncate for button display
+        };
+      });
 
       const bodyText = `Found ${products.length} products. Please select the correct one:\n\n${products.map((p, i) => 
         `${i + 1}. ${p.name} (SKU: ${p.sku}) - Stock: ${p.stockAvailable}`
       ).join('\n')}`;
 
+      console.log('Sending buttons:', buttons);
       await this.sendInteractiveButtons(
         to,
         bodyText,
@@ -1848,7 +1871,9 @@ export class EnhancedWhatsAppService {
 
       // Product selection buttons (new format)
       if (id.startsWith("select_product_")) {
+        console.log('Handling select_product_ button:', id);
         const response = await this.handleProductSelectionButton(userPhone, id, state);
+        console.log('Button response:', response);
         if (response && response.trim()) {
           await this.sendWhatsAppMessage(userPhone, response);
         }
