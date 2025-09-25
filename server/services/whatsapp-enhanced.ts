@@ -987,17 +987,25 @@ export class EnhancedWhatsAppService {
     console.log('Processing button click:', buttonId);
     
     // Parse button ID: select_product_{productId}_{action}_{quantity}
+    // Since action can contain underscores (e.g., "add_stock"), we need to parse differently
     const parts = buttonId.split('_');
     console.log('Button ID parts:', parts);
     
-    if (parts.length < 5) {
+    if (parts.length < 6) {
       console.log('Invalid button ID format, parts length:', parts.length);
       return "Invalid selection. Please try again.";
     }
 
+    // For button ID: select_product_{productId}_add_stock_{quantity}
+    // parts[0] = 'select'
+    // parts[1] = 'product' 
+    // parts[2] = productId
+    // parts[3] = 'add'
+    // parts[4] = 'stock'
+    // parts[5] = quantity
     const productId = parts[2];
-    const action = parts[3];
-    const quantity = parseInt(parts[4]);
+    const action = `${parts[3]}_${parts[4]}`; // Reconstruct "add_stock"
+    const quantity = parseInt(parts[5]);
     
     console.log('Parsed values:', { productId, action, quantity });
 
@@ -1059,6 +1067,8 @@ export class EnhancedWhatsAppService {
     const selectedProduct = products[selectedIndex];
     const action = state.lastContext.action;
     const quantity = state.lastContext.quantity;
+
+    console.log('Numeric selection:', { selectedIndex, action, quantity, productName: selectedProduct.name });
 
     // Clear the product selection context
     state.lastContext = undefined;
