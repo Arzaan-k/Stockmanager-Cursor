@@ -1008,8 +1008,12 @@ export class EnhancedWhatsAppService {
       state.currentFlow = 'adding_stock';
       state.pendingStockAddition = {
         productId,
+        productName: product.name,
+        sku: product.sku || '',
         quantity,
-        awaitingConfirmation: true
+        currentStock: product.stockAvailable || 0,
+        awaitingConfirmation: true,
+        awaitingQuantity: false
       };
       
       return `Selected: ${product.name} (SKU: ${product.sku})\nCurrent stock: ${product.stockAvailable} units\nYou want to add: ${quantity} units\nPlease tell me your name for the record:`;
@@ -1052,8 +1056,12 @@ export class EnhancedWhatsAppService {
       state.currentFlow = 'adding_stock';
       state.pendingStockAddition = {
         productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        sku: selectedProduct.sku || '',
         quantity,
-        awaitingConfirmation: true
+        currentStock: selectedProduct.stockAvailable || 0,
+        awaitingConfirmation: true,
+        awaitingQuantity: false
       };
       
       return `Selected: ${selectedProduct.name} (SKU: ${selectedProduct.sku})\nCurrent stock: ${selectedProduct.stockAvailable} units\nYou want to add: ${quantity} units\nPlease tell me your name for the record:`;
@@ -1834,6 +1842,15 @@ export class EnhancedWhatsAppService {
           await this.sendInteractiveList(userPhone, "Choose a product to view stock:", rows, "Select", "Products");
         } else {
           await this.sendWhatsAppMessage(userPhone, "No products found.");
+        }
+        return;
+      }
+
+      // Product selection buttons (new format)
+      if (id.startsWith("select_product_")) {
+        const response = await this.handleProductSelectionButton(userPhone, id, state);
+        if (response && response.trim()) {
+          await this.sendWhatsAppMessage(userPhone, response);
         }
         return;
       }
