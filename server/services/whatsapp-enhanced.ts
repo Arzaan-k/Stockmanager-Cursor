@@ -225,11 +225,30 @@ export class EnhancedWhatsAppService {
     // Check if we're awaiting user name (either in awaiting_name flow or adding_stock flow with pendingStockAddition)
     if ((state.currentFlow === 'awaiting_name' || state.currentFlow === 'adding_stock') && 
         state.pendingStockAddition && 
-        !state.pendingStockAddition.awaitingConfirmation) {
+        !state.pendingStockAddition.awaitingConfirmation && 
+        !state.userName) {
       console.log('Processing user name input:', message);
       state.userName = message.trim();
       state.currentFlow = 'adding_stock';
       state.pendingStockAddition.awaitingConfirmation = true;
+      
+      const { productName, quantity, currentStock } = state.pendingStockAddition;
+      return `Thank you, ${state.userName}! 👤\n\n` +
+             `📦 Confirming stock addition:\n` +
+             `Product: ${productName}\n` +
+             `Adding: ${quantity} units\n` +
+             `Current stock: ${currentStock} units\n` +
+             `New stock will be: ${currentStock + quantity} units\n\n` +
+             `Reply with "yes" to confirm or "no" to cancel.`;
+    }
+    
+    // Check if we have pendingStockAddition but user already provided name - process confirmation
+    if (state.pendingStockAddition && 
+        state.pendingStockAddition.awaitingConfirmation && 
+        state.userName && 
+        !/^(yes|y|confirm|ok|correct|no|n|cancel)$/i.test(message.trim())) {
+      console.log('User provided name but not confirmation, processing as name input:', message);
+      state.userName = message.trim();
       
       const { productName, quantity, currentStock } = state.pendingStockAddition;
       return `Thank you, ${state.userName}! 👤\n\n` +
@@ -1041,7 +1060,7 @@ export class EnhancedWhatsAppService {
         sku: product.sku || '',
         quantity,
         currentStock: product.stockAvailable || 0,
-        awaitingConfirmation: true,
+        awaitingConfirmation: false, // Set to false initially, will be true after name
         awaitingQuantity: false
       };
       
@@ -1093,7 +1112,7 @@ export class EnhancedWhatsAppService {
         sku: selectedProduct.sku || '',
         quantity,
         currentStock: selectedProduct.stockAvailable || 0,
-        awaitingConfirmation: true,
+        awaitingConfirmation: false, // Set to false initially, will be true after name
         awaitingQuantity: false
       };
       
@@ -1122,6 +1141,15 @@ export class EnhancedWhatsAppService {
       const message = messageText.trim();
       let response = '';
       
+      // Debug logging
+      console.log('handleTextMessage called:', {
+        message,
+        currentFlow: state.currentFlow,
+        hasPendingStockAddition: !!state.pendingStockAddition,
+        awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
+        lastContextType: state.lastContext?.type
+      });
+      
       // Check if this is a product selection button click
       if (message.startsWith('select_product_')) {
         response = await this.handleProductSelectionButton(userPhone, message, state);
@@ -1130,10 +1158,11 @@ export class EnhancedWhatsAppService {
       else if (state.lastContext?.type === 'product_selection' && /^\d+$/.test(message)) {
         response = await this.handleNumericProductSelection(userPhone, message, state);
       }
-      // Check if we're in the middle of a flow
-      else if (state.currentFlow === 'awaiting_name' || 
-          state.currentFlow === 'adding_stock' || 
-          state.pendingStockAddition?.awaitingConfirmation) {
+      // Check if we're in the middle of a flow - PRIORITIZE this check
+      else if (state.pendingStockAddition || 
+               state.currentFlow === 'awaiting_name' || 
+               state.currentFlow === 'adding_stock') {
+        console.log('Processing as stock addition flow');
         response = await this.handleStockAddition(userPhone, message, state);
       } else if (state.currentFlow === 'creating_order' || 
                  state.currentFlow === 'collecting_order_details' ||
