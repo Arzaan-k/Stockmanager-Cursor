@@ -198,6 +198,14 @@ export class EnhancedWhatsAppService {
 
   // Handle stock addition flow
   private async handleStockAddition(userPhone: string, message: string, state: ConversationState): Promise<string> {
+    console.log('handleStockAddition called:', {
+      currentFlow: state.currentFlow,
+      hasPendingStockAddition: !!state.pendingStockAddition,
+      awaitingQuantity: state.pendingStockAddition?.awaitingQuantity,
+      awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
+      message: message
+    });
+    
     // If we're waiting for a quantity, lock product and parse number only
     if (state.currentFlow === 'adding_stock' && state.pendingStockAddition?.awaitingQuantity) {
       const qtyMatch = message.match(/(\d+)/);
@@ -214,8 +222,11 @@ export class EnhancedWhatsAppService {
              `Current: ${currentStock} • Add: ${qty} • New: ${currentStock + qty}` +
              `\n\nReply with "yes" to confirm or "no" to cancel.`;
     }
-    // Check if we're awaiting user name
-    if (state.currentFlow === 'awaiting_name' && state.pendingStockAddition) {
+    // Check if we're awaiting user name (either in awaiting_name flow or adding_stock flow with pendingStockAddition)
+    if ((state.currentFlow === 'awaiting_name' || state.currentFlow === 'adding_stock') && 
+        state.pendingStockAddition && 
+        !state.pendingStockAddition.awaitingConfirmation) {
+      console.log('Processing user name input:', message);
       state.userName = message.trim();
       state.currentFlow = 'adding_stock';
       state.pendingStockAddition.awaitingConfirmation = true;
