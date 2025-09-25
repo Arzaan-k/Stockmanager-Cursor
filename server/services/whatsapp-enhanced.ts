@@ -562,6 +562,12 @@ export class EnhancedWhatsAppService {
       case 'collecting_items': {
         // Check if user wants to proceed with collected items
         if (order.items.length > 0 && /^(yes|y|done|proceed|next)$/i.test(message.trim())) {
+          // Validate that we have items
+          if (order.items.length === 0) {
+            return `❌ No items in your order. Please add items before proceeding.\n\n` +
+                   `Example: "10 units of socket plugs"`;
+          }
+          
           order.step = 'collecting_customer_info';
           order.currentQuestion = 'customer_name';
           return `Great! I need some details for the order.\n\n` +
@@ -639,7 +645,11 @@ export class EnhancedWhatsAppService {
       case 'collecting_customer_info': {
         // Handle customer information collection
         if (order.currentQuestion === 'customer_name') {
-          order.customerName = message.trim();
+          const name = message.trim();
+          if (!name || name.length < 2) {
+            return `❌ Please provide a valid customer name (at least 2 characters).`;
+          }
+          order.customerName = name;
           order.currentQuestion = 'customer_phone';
           await this.sendInteractiveButtons(
             userPhone,
@@ -650,7 +660,11 @@ export class EnhancedWhatsAppService {
         }
         
         if (order.currentQuestion === 'customer_phone') {
-          order.customerPhone = message.trim();
+          const phone = message.trim();
+          if (!phone || phone.length < 10) {
+            return `❌ Please provide a valid phone number (at least 10 digits).`;
+          }
+          order.customerPhone = phone;
           order.currentQuestion = 'customer_email';
           await this.sendInteractiveButtons(
             userPhone,
@@ -725,63 +739,91 @@ export class EnhancedWhatsAppService {
         if (/^(confirm|yes|y|ok|place order)$/i.test(message.trim())) {
           // Create the order in database
           try {
-            // First, create or find customer
-            let customer = (await storage.getCustomers()).find(c => c.phone === order.customerPhone || c.name === order.customerName);
+            // Validate required fields
+            if (!order.customerName || !order.customerPhone) {
+              return `❌ Missing required information. Please provide customer name and phone number.`;
+            }
             
-            if (!customer) {
-              customer = await storage.createCustomer({
-                name: order.customerName!,
-                phone: order.customerPhone,
-                email: order.customerEmail
+            if (!order.items || order.items.length === 0) {
+              return `❌ No items in order. Please add items before confirming.`;
+            }
+            
+            // First, create or find customer
+            let customer;
+            try {
+              const existingCustomers = await storage.getCustomers();
+              customer = existingCustomers.find(c => c.phone === order.customerPhone || c.name === order.customerName);
+              
+              if (!customer) {
+                customer = await storage.createCustomer({
+                  name: order.customerName,
+                  phone: order.customerPhone,
+                  email: order.customerEmail
+                });
+              }
+            } catch (customerError) {
+              console.error("Error creating/finding customer:", customerError);
+              return `❌ Error processing customer information. Please try again.`;
+            }
+            
+            // Validate and process order items
+            const orderItems = [];
+            let subtotal = 0;
+            let needsApproval = false;
+            
+            for (const item of order.items) {
+              const product = await storage.getProduct(item.productId);
+              if (!product) {
+                return `❌ Product not found: ${item.productName || item.productId}. Please remove this item and try again.`;
+              }
+              
+              // Validate quantity
+              if (!item.quantity || item.quantity <= 0) {
+                return `❌ Invalid quantity for ${item.productName}. Please check your order.`;
+              }
+              
+              // Get product price (default to 0 if not set)
+              const unitPrice = Number(product.price || 0);
+              const totalPrice = item.quantity * unitPrice;
+              subtotal += totalPrice;
+              
+              // Check if item needs approval (out of stock)
+              if ((product.stockAvailable || 0) < item.quantity) {
+                needsApproval = true;
+              }
+              
+              orderItems.push({
+                productId: item.productId,
+                quantity: item.quantity,
+                unitPrice: unitPrice.toString(),
+                totalPrice: totalPrice.toString()
               });
             }
             
-            // Calculate subtotal and total
-            const subtotal = order.items.reduce((sum, item) => sum + (item.quantity * Number(item.unitPrice || 0)), 0);
             const tax = 0;
             const total = subtotal + tax;
             
-            // Pre-compute approval status with await
-            let needsApproval = false;
-            for (const item of order.items) {
-              const product = await storage.getProduct(item.productId);
-              if (product && (product.stockAvailable || 0) < item.quantity) {
-                needsApproval = true;
-                break;
-              }
-            }
-            
-            // Create order items with await
-            const orderItems = [];
-            for (const item of order.items) {
-              const product = await storage.getProduct(item.productId);
-              if (product) {
-                orderItems.push({
-                  productId: item.productId,
-                  quantity: item.quantity,
-                  unitPrice: Number(product.price || 0).toString(),
-                  totalPrice: (item.quantity * Number(product.price || 0)).toString()
-                });
-              } else {
-                throw new Error(`Product not found: ${item.productId}`);
-              }
-            }
-            
             // Create order
-            const newOrder = await storage.createOrder({
-              customerId: customer.id,
-              customerName: order.customerName!,
-              customerEmail: order.customerEmail,
-              customerPhone: order.customerPhone,
-              containerNumber: order.containerNumber,
-              jobOrder: order.jobId,
-              status: "pending",
-              approvalStatus: needsApproval ? "needs_approval" : "pending",
-              subtotal: subtotal.toString(),
-              tax: tax.toString(),
-              total: total.toString(),
-              notes: `Order placed via WhatsApp by ${order.purchaserName}\nContainer: ${order.containerNumber}\nJob ID: ${order.jobId}`
-            }, orderItems);
+            let newOrder;
+            try {
+              newOrder = await storage.createOrder({
+                customerId: customer.id,
+                customerName: order.customerName,
+                customerEmail: order.customerEmail,
+                customerPhone: order.customerPhone,
+                containerNumber: order.containerNumber,
+                jobOrder: order.jobId,
+                status: "pending",
+                approvalStatus: needsApproval ? "needs_approval" : "pending",
+                subtotal: subtotal.toString(),
+                tax: tax.toString(),
+                total: total.toString(),
+                notes: `Order placed via WhatsApp by ${order.purchaserName || 'Unknown'}\nContainer: ${order.containerNumber || 'N/A'}\nJob ID: ${order.jobId || 'N/A'}`
+              }, orderItems);
+            } catch (orderError) {
+              console.error("Error creating order:", orderError);
+              return `❌ Error creating order: ${(orderError as Error).message || 'Unknown error'}. Please try again.`;
+            }
             
             // Log without meta
             await storage.createWhatsappLog({
