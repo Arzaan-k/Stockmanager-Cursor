@@ -181,11 +181,24 @@ export async function generateWhatsAppResponse(
       const products = await storage.searchProducts(productQuery);
       const fuzzyProducts = await storage.searchProductsFuzzy(productQuery);
       
-      const product = products[0] || fuzzyProducts[0];
+      // Combine and deduplicate results
+      const allProducts = [...products];
+      fuzzyProducts.forEach(fp => {
+        if (!allProducts.find(p => p.id === fp.id)) {
+          allProducts.push(fp);
+        }
+      });
       
-      if (product) {
-        // Check if this is an add operation
-        const isAdd = /ઉમેર|add|put|insert/i.test(userMessage);
+      // Check if this is an add operation
+      const isAdd = /ઉમેર|add|put|insert/i.test(userMessage);
+      
+      if (allProducts.length === 0) {
+        return {
+          response: `No products found matching "${productQuery}". Please check the spelling or try a different product name.`
+        };
+      } else if (allProducts.length === 1) {
+        // Single product found - proceed directly
+        const product = allProducts[0];
         if (isAdd) {
           state.lastContext = {
             pendingAction: {
@@ -195,11 +208,35 @@ export async function generateWhatsAppResponse(
             }
           };
           return {
-            response: `Found product: ${product.name}. Current stock: ${product.stockAvailable}. Adding ${quantity} units. Is this correct?`,
+            response: `Found product: ${product.name} (SKU: ${product.sku})\nCurrent stock: ${product.stockAvailable} units\nYou want to add: ${quantity} units\nPlease tell me your name for the record:`,
             pendingAction: {
               type: 'add_stock',
               productId: product.id,
               quantity
+            }
+          };
+        }
+      } else {
+        // Multiple products found - show selection options
+        if (isAdd) {
+          // Store the context for product selection
+          state.lastContext = {
+            type: 'product_selection',
+            productQuery,
+            quantity,
+            action: 'add_stock',
+            products: allProducts.slice(0, 5) // Limit to 5 products for buttons
+          };
+          
+          // Return a special response that will trigger button sending
+          return {
+            response: `MULTIPLE_PRODUCTS_FOUND:${allProducts.length}:${productQuery}:${quantity}:add_stock`,
+            pendingAction: {
+              type: 'select_product',
+              productQuery,
+              quantity,
+              action: 'add_stock',
+              products: allProducts.slice(0, 5)
             }
           };
         }

@@ -364,21 +364,19 @@ export class EnhancedWhatsAppService {
     if (!product && productName) {
       const candidates = await storage.searchProductsFuzzy(productName);
       if (candidates && candidates.length > 1) {
-        const top = candidates.slice(0, 10);
-        state.pendingStockAddition = {
-          productId: '',
-          productName: productName,
-          sku: '',
-          quantity: quantity || 0,
-          currentStock: 0,
-          awaitingConfirmation: false,
-          awaitingQuantity: !quantity,
-          awaitingProductSelection: true,
-          candidates: top.map(p => ({ productId: p.id, productName: p.name, sku: p.sku }))
+        const top = candidates.slice(0, 5); // Limit to 5 for buttons
+        
+        // Store the context for product selection
+        state.lastContext = {
+          type: 'product_selection',
+          productQuery: productName,
+          quantity: quantity || 1,
+          action: 'add_stock',
+          products: top
         };
 
-        const rows = top.map((p, idx) => ({ id: `product:select:${p.id}`, title: `${idx + 1}. ${p.name}`, description: `SKU: ${p.sku}` }));
-        await this.sendInteractiveList(userPhone, `I found multiple matches for "${productName}". Please select one:`, rows, "Select", "Matches");
+        // Send product selection buttons
+        await this.sendProductSelectionButtons(userPhone, top, quantity || 1, 'add_stock');
         return "";
       }
     }
@@ -959,6 +957,95 @@ export class EnhancedWhatsAppService {
     
     return "Product selected successfully! What would you like to do next?";
   }
+
+  // Handle product selection button click
+  private async handleProductSelectionButton(userPhone: string, buttonId: string, state: ConversationState): Promise<string> {
+    // Parse button ID: select_product_{productId}_{action}_{quantity}
+    const parts = buttonId.split('_');
+    if (parts.length < 5) {
+      return "Invalid selection. Please try again.";
+    }
+
+    const productId = parts[2];
+    const action = parts[3];
+    const quantity = parseInt(parts[4]);
+
+    // Get the product details
+    const product = await storage.getProduct(productId);
+    if (!product) {
+      return "Product not found. Please try again.";
+    }
+
+    // Clear the product selection context
+    state.lastContext = undefined;
+
+    if (action === 'add_stock') {
+      // Proceed with stock addition
+      state.currentFlow = 'adding_stock';
+      state.pendingStockAddition = {
+        productId,
+        quantity,
+        awaitingConfirmation: true
+      };
+      
+      return `Selected: ${product.name} (SKU: ${product.sku})\nCurrent stock: ${product.stockAvailable} units\nYou want to add: ${quantity} units\nPlease tell me your name for the record:`;
+    } else if (action === 'create_order') {
+      // Proceed with order creation
+      state.currentFlow = 'creating_order';
+      state.pendingOrder = {
+        items: [{ productId, quantity, confirmed: false }],
+        step: 'collecting_items'
+      };
+      
+      return `Selected: ${product.name} (SKU: ${product.sku})\nQuantity: ${quantity} units\nPlease tell me your name to proceed with the order:`;
+    }
+
+    return "Action not supported. Please try again.";
+  }
+
+  // Handle numeric product selection (fallback for text-based selection)
+  private async handleNumericProductSelection(userPhone: string, selectionText: string, state: ConversationState): Promise<string> {
+    if (state.lastContext?.type !== 'product_selection') {
+      return "I'm not currently waiting for a product selection. Please try again.";
+    }
+
+    const selectedIndex = parseInt(selectionText) - 1;
+    const products = state.lastContext.products;
+    
+    if (selectedIndex < 0 || selectedIndex >= products.length) {
+      return "Invalid selection. Please choose a valid number.";
+    }
+
+    const selectedProduct = products[selectedIndex];
+    const action = state.lastContext.action;
+    const quantity = state.lastContext.quantity;
+
+    // Clear the product selection context
+    state.lastContext = undefined;
+
+    if (action === 'add_stock') {
+      // Proceed with stock addition
+      state.currentFlow = 'adding_stock';
+      state.pendingStockAddition = {
+        productId: selectedProduct.id,
+        quantity,
+        awaitingConfirmation: true
+      };
+      
+      return `Selected: ${selectedProduct.name} (SKU: ${selectedProduct.sku})\nCurrent stock: ${selectedProduct.stockAvailable} units\nYou want to add: ${quantity} units\nPlease tell me your name for the record:`;
+    } else if (action === 'create_order') {
+      // Proceed with order creation
+      state.currentFlow = 'creating_order';
+      state.pendingOrder = {
+        items: [{ productId: selectedProduct.id, quantity, confirmed: false }],
+        step: 'collecting_items'
+      };
+      
+      return `Selected: ${selectedProduct.name} (SKU: ${selectedProduct.sku})\nQuantity: ${quantity} units\nPlease tell me your name to proceed with the order:`;
+    }
+
+    return "Action not supported. Please try again.";
+  }
   
   // Main message handler
   async handleTextMessage(userPhone: string, messageText: string): Promise<void> {
@@ -970,8 +1057,16 @@ export class EnhancedWhatsAppService {
       const message = messageText.trim();
       let response = '';
       
+      // Check if this is a product selection button click
+      if (message.startsWith('select_product_')) {
+        response = await this.handleProductSelectionButton(userPhone, message, state);
+      }
+      // Check if this is a numeric selection (fallback for text-based selection)
+      else if (state.lastContext?.type === 'product_selection' && /^\d+$/.test(message)) {
+        response = await this.handleNumericProductSelection(userPhone, message, state);
+      }
       // Check if we're in the middle of a flow
-      if (state.currentFlow === 'awaiting_name' || 
+      else if (state.currentFlow === 'awaiting_name' || 
           state.currentFlow === 'adding_stock' || 
           state.pendingStockAddition?.awaitingConfirmation) {
         response = await this.handleStockAddition(userPhone, message, state);
@@ -1001,6 +1096,24 @@ export class EnhancedWhatsAppService {
       
       // Send response only if non-empty
       if (response && response.trim().length > 0) {
+        // Check if this is a special response for multiple products
+        if (response.startsWith('MULTIPLE_PRODUCTS_FOUND:')) {
+          const parts = response.split(':');
+          if (parts.length >= 5) {
+            const productCount = parseInt(parts[1]);
+            const productQuery = parts[2];
+            const quantity = parseInt(parts[3]);
+            const action = parts[4];
+            
+            // Get the products from the pending action
+            const products = state.lastContext?.products || [];
+            if (products.length > 0) {
+              await this.sendProductSelectionButtons(userPhone, products, quantity, action);
+              return; // Don't send the text message
+            }
+          }
+        }
+        
         await this.sendWhatsAppMessage(userPhone, response);
       } else {
         console.log(`Skipping empty response for ${userPhone}`);
@@ -1442,6 +1555,41 @@ export class EnhancedWhatsAppService {
       console.error("Error sending interactive buttons:", error);
       // Fallback to text
       await this.sendWhatsAppMessage(to, bodyText + "\n\n(" + buttons.map(b => b.title).join(" | ") + ")");
+    }
+  }
+
+  // Send product selection buttons
+  private async sendProductSelectionButtons(
+    to: string,
+    products: Array<{ id: string; name: string; sku: string; stockAvailable: number }>,
+    quantity: number,
+    action: string
+  ): Promise<void> {
+    try {
+      // Create buttons for each product (max 3 for WhatsApp)
+      const buttons = products.slice(0, 3).map((product, index) => ({
+        id: `select_product_${product.id}_${action}_${quantity}`,
+        title: `${product.name.substring(0, 15)}...` // Truncate for button display
+      }));
+
+      const bodyText = `Found ${products.length} products. Please select the correct one:\n\n${products.map((p, i) => 
+        `${i + 1}. ${p.name} (SKU: ${p.sku}) - Stock: ${p.stockAvailable}`
+      ).join('\n')}`;
+
+      await this.sendInteractiveButtons(
+        to,
+        bodyText,
+        buttons,
+        "Product Selection",
+        `Quantity: ${quantity} units`
+      );
+    } catch (error) {
+      console.error("Error sending product selection buttons:", error);
+      // Fallback to text message
+      const textMessage = `Found ${products.length} products. Please reply with the number:\n\n${products.map((p, i) => 
+        `${i + 1}. ${p.name} (SKU: ${p.sku}) - Stock: ${p.stockAvailable}`
+      ).join('\n')}\n\nReply with the number (1-${Math.min(products.length, 3)}) to select.`;
+      await this.sendWhatsAppMessage(to, textMessage);
     }
   }
 
