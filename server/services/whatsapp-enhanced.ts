@@ -1159,6 +1159,37 @@ export class EnhancedWhatsAppService {
         }
       }
       
+      // Check if we have a pending action from gemini.ts that needs to be processed
+      if (state.lastContext?.pendingAction) {
+        const pendingAction = state.lastContext.pendingAction;
+        console.log('Processing pending action from gemini:', pendingAction);
+        
+        if (pendingAction.type === 'add_stock' && pendingAction.productId && pendingAction.quantity) {
+          // Set up the stock addition flow
+          state.currentFlow = 'adding_stock';
+          state.pendingStockAddition = {
+            productId: pendingAction.productId,
+            productName: '', // Will be filled when we get the product
+            sku: '',
+            quantity: pendingAction.quantity,
+            currentStock: 0,
+            awaitingConfirmation: false,
+            awaitingQuantity: false
+          };
+          
+          // Get the product details
+          const product = await storage.getProduct(pendingAction.productId);
+          if (product) {
+            state.pendingStockAddition.productName = product.name;
+            state.pendingStockAddition.sku = product.sku || '';
+            state.pendingStockAddition.currentStock = product.stockAvailable || 0;
+          }
+          
+          // Clear the pending action
+          state.lastContext.pendingAction = undefined;
+        }
+      }
+      
       // Send response only if non-empty
       if (response && response.trim().length > 0) {
         // Check if this is a special response for multiple products
