@@ -571,7 +571,9 @@ export class EnhancedWhatsAppService {
           message, 
           orderItems: order.items.length, 
           currentFlow: state.currentFlow,
-          hasPendingOrder: !!state.pendingOrder 
+          hasPendingOrder: !!state.pendingOrder,
+          lastContextType: state.lastContext?.type,
+          lastContextProductId: state.lastContext?.productId
         });
         
         // Check if user wants to proceed with collected items
@@ -586,6 +588,50 @@ export class EnhancedWhatsAppService {
           order.currentQuestion = 'customer_name';
           return `Great! I need some details for the order.\n\n` +
                  `Please provide the customer's name:`;
+        }
+        
+        // Check if we're coming from check stock flow and user is providing quantity only
+        if (state.lastContext?.type === 'product_identified' && state.lastContext?.productId) {
+          const productId = state.lastContext.productId;
+          const product = await storage.getProduct(productId);
+          
+          if (product) {
+            // Extract quantity from message
+            const qtyMatch = message.match(/(\d+)/);
+            const quantity = qtyMatch ? Math.abs(parseInt(qtyMatch[1])) : undefined;
+            
+            if (quantity && quantity > 0) {
+              // Add the product to the order
+              order.items.push({
+                productId: product.id,
+                productName: product.name,
+                sku: product.sku || 'NA',
+                quantity: quantity,
+                unitPrice: product.price
+              });
+              
+              // Clear the context
+              state.lastContext = undefined;
+              
+              const itemsList = order.items.map((item, i) => 
+                `${i + 1}. ${item.productName} - ${item.quantity} units`
+              ).join('\n');
+              
+              await this.sendInteractiveButtons(
+                userPhone,
+                `✅ Added to order\n\n${product.name} - ${quantity} units\n\n📋 Current order:\n${itemsList}`,
+                [
+                  { id: "order:add_more", title: "Add More" },
+                  { id: "order:proceed", title: "Proceed" },
+                  { id: "order:cancel", title: "Cancel Order" }
+                ],
+                "Order actions"
+              );
+              return "";
+            } else {
+              return `Please enter a valid quantity for ${product.name}.\nExample: "10" or "order 10 units"`;
+            }
+          }
         }
         
         // Try to extract product and quantity
@@ -2245,15 +2291,58 @@ export class EnhancedWhatsAppService {
       // Product actions with product id
       if (id.startsWith("product:add:")) {
         const productId = id.split(":")[2];
+        const product = await storage.getProduct(productId);
+        if (!product) {
+          await this.sendWhatsAppMessage(userPhone, "❌ Product not found.");
+          return;
+        }
+        
+        // Set up proper stock addition flow
+        state.currentFlow = 'adding_stock';
         state.lastContext = { type: 'product_identified', productId, timestamp: new Date() } as any;
-        await this.sendWhatsAppMessage(userPhone, "Enter quantity to add. Example: 'add 25 units'");
+        state.pendingStockAddition = {
+          productId: product.id,
+          productName: product.name,
+          sku: product.sku || '',
+          quantity: 0, // Will be set when user provides quantity
+          currentStock: product.stockAvailable || 0,
+          awaitingConfirmation: false,
+          awaitingQuantity: true
+        };
+        
+        await this.sendWhatsAppMessage(userPhone, 
+          `📦 **Add Stock for ${product.name}**\n\n` +
+          `Current stock: ${product.stockAvailable || 0} units\n` +
+          `SKU: ${product.sku}\n\n` +
+          `Enter quantity to add. Example: 'add 25 units' or just '25'`
+        );
         return;
       }
       if (id.startsWith("product:order:")) {
         const productId = id.split(":")[2];
-        state.lastContext = { type: 'product_identified', productId, timestamp: new Date() } as any;
+        const product = await storage.getProduct(productId);
+        if (!product) {
+          await this.sendWhatsAppMessage(userPhone, "❌ Product not found.");
+          return;
+        }
+        
+        // Set up proper order creation flow
         state.currentFlow = 'creating_order';
-        await this.sendWhatsAppMessage(userPhone, "Enter quantity to order. Example: 'order 10 units'");
+        state.lastContext = { type: 'product_identified', productId, timestamp: new Date() } as any;
+        
+        // Initialize order with the selected product
+        state.pendingOrder = {
+          items: [],
+          step: 'collecting_items'
+        };
+        
+        await this.sendWhatsAppMessage(userPhone, 
+          `🛒 **Create Order for ${product.name}**\n\n` +
+          `Current stock: ${product.stockAvailable || 0} units\n` +
+          `SKU: ${product.sku}\n` +
+          `Price: $${product.price || 0}\n\n` +
+          `Enter quantity to order. Example: 'order 10 units' or just '10'`
+        );
         return;
       }
       if (id.startsWith("product:check:")) {
