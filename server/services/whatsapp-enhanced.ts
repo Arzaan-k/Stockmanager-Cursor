@@ -1264,368 +1264,58 @@ export class EnhancedWhatsAppService {
     return "Action not supported. Please try again.";
   }
   
-  // Handle check stock flow with enhanced catalog system
+  // Handle check stock flow with enhanced intelligence
   private async handleCheckStock(userPhone: string, message: string, state: ConversationState): Promise<string> {
     console.log('handleCheckStock called:', { message, currentFlow: state.currentFlow });
     
     // Handle special commands
-    if (message.toLowerCase() === 'menu' || message.toLowerCase() === 'main') {
-      await this.sendCatalogMainMenu(userPhone);
+    const msg = message.toLowerCase().trim();
+    if (msg === 'menu' || msg === 'main' || msg === 'back') {
+      await this.sendCheckStockMainMenu(userPhone);
       return "";
     }
     
-    // Handle search queries
+    // Handle quick filters
+    if (msg === 'low' || msg === 'low stock') {
+      await this.sendLowStockProducts(userPhone);
+      return "";
+    }
+    if (msg === 'out' || msg === 'out of stock' || msg === 'zero') {
+      await this.sendOutOfStockProducts(userPhone);
+      return "";
+    }
+    if (msg === 'all' || msg === 'list' || msg === 'everything') {
+      await this.sendAllProductsList(userPhone);
+      return "";
+    }
+    
+    // Handle category searches
+    const categories = await this.getProductCategories();
+    const categoryMatch = categories.find(cat => 
+      cat.name.toLowerCase().includes(msg) || msg.includes(cat.name.toLowerCase())
+    );
+    if (categoryMatch) {
+      await this.sendProductsByCategory(userPhone, categoryMatch.name);
+      return "";
+    }
+    
+    // Extract product and quantity from message
     const { product, products } = await this.extractProductAndQuantity(message);
     
-    // If multiple products found, show them with stock levels
+    // If multiple products found, show them with interactive buttons
     if (products && products.length > 1) {
-      const stockList = products.slice(0, 10).map((p, i) => {
-        const stockIcon = this.getStockIcon(p);
-        return `${i + 1}. ${stockIcon} **${p.name}** (SKU: ${p.sku})\n   Available: ${p.stockAvailable || 0} | Total: ${p.stockTotal || 0} | Price: $${p.price || 0}`;
-      }).join('\n\n');
-      
-      const response = `🔍 **Found ${products.length} products matching "${message}":**\n\n${stockList}${products.length > 10 ? `\n\n... and ${products.length - 10} more products` : ''}\n\n**To view details:** Type the product name or SKU.`;
-      
-      // Reset flow to allow new search
-      state.currentFlow = 'checking_stock';
-      return response;
+      await this.sendProductSearchResults(userPhone, products, message);
+      return "";
     }
-    // If single product found, show detailed info
+    // If single product found, show detailed info with actions
     else if (product) {
       await this.sendProductDetails(userPhone, product.id);
       return "";
     } 
-    // If no products found, provide helpful suggestions
+    // If no products found, provide smart suggestions
     else {
-      const suggestions = `❌ **No products found matching "${message}"**\n\n` +
-        `**Try these suggestions:**\n` +
-        `• Use partial names: "sensor" instead of "carrier data recorder sensor"\n` +
-        `• Use SKU codes: "Q-002032"\n` +
-        `• Use broader terms: "plug", "cable", "sensor"\n\n` +
-        `**Or type "menu" to browse by category.**`;
-      
-      // Reset flow to allow new search
-      state.currentFlow = 'checking_stock';
-      return suggestions;
-    }
-  }
-  
-  // Send catalog main menu with categories and search options
-  private async sendCatalogMainMenu(userPhone: string): Promise<void> {
-    try {
-      // Get product categories and counts
-      const products = await storage.getProducts({});
-      const categories = this.getProductCategories(products);
-      
-      const categoryButtons = categories.slice(0, 3).map(cat => ({
-        id: `catalog:category:${cat.name}`,
-        title: `${cat.name} (${cat.count})`
-      }));
-      
-      const buttons = [
-        ...categoryButtons,
-        { id: "catalog:search", title: "🔍 Search" },
-        { id: "catalog:all", title: "📋 All Products" },
-        { id: "catalog:low_stock", title: "⚠️ Low Stock" },
-        { id: "catalog:out_of_stock", title: "❌ Out of Stock" }
-      ];
-      
-      const message = `🏪 **Stock Catalog**\n\n` +
-        `**Total Products:** ${products.length}\n` +
-        `**Categories Available:** ${categories.length}\n\n` +
-        `Choose how you'd like to browse:`;
-      
-      await this.sendInteractiveButtons(
-        userPhone,
-        message,
-        buttons,
-        "Catalog Menu"
-      );
-    } catch (error) {
-      console.error("Error sending catalog main menu:", error);
-      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the catalog. Please try again.");
-    }
-  }
-  
-  // Get product categories with counts
-  private getProductCategories(products: any[]): Array<{name: string, count: number, type: string}> {
-    const categoryMap = new Map<string, number>();
-    
-    products.forEach(product => {
-      if (product.type) {
-        const count = categoryMap.get(product.type) || 0;
-        categoryMap.set(product.type, count + 1);
-      }
-    });
-    
-    return Array.from(categoryMap.entries())
-      .map(([type, count]) => ({ name: type, count, type }))
-      .sort((a, b) => b.count - a.count);
-  }
-  
-  // Get stock icon for a product
-  private getStockIcon(product: any): string {
-    const available = product.stockAvailable || 0;
-    const minLevel = product.minStockLevel || 10;
-    
-    if (available === 0) return "❌";
-    if (available <= minLevel) return "⚠️";
-    return "✅";
-  }
-  
-  // Send detailed product view
-  private async sendProductDetails(userPhone: string, productId: string): Promise<void> {
-    try {
-      const product = await storage.getProduct(productId);
-      if (!product) {
-        await this.sendWhatsAppMessage(userPhone, "❌ Product not found.");
-        return;
-      }
-      
-      const stockStatus = this.getStockStatus(product);
-      const stockIcon = this.getStockIcon(product);
-      
-      const message = `📊 **${product.name}**\n\n` +
-        `**SKU:** ${product.sku}\n` +
-        `**Type:** ${product.type || 'N/A'}\n` +
-        `**Status:** ${stockIcon} ${stockStatus}\n\n` +
-        `📈 **Stock Information:**\n` +
-        `• Available: ${product.stockAvailable || 0} units\n` +
-        `• Total: ${product.stockTotal || 0} units\n` +
-        `• Used: ${product.stockUsed || 0} units\n` +
-        `• Min Level: ${product.minStockLevel || 0} units\n\n` +
-        `💰 **Price:** $${product.price || 0}\n` +
-        `📦 **Group:** ${product.groupName || 'N/A'}\n` +
-        `🏷️ **Part Code:** ${product.crystalPartCode || 'N/A'}\n\n` +
-        `**What would you like to do?**`;
-      
-      const buttons = [
-        { id: `product:add:${product.id}`, title: "➕ Add Stock" },
-        { id: `product:order:${product.id}`, title: "🛒 Create Order" },
-        { id: "catalog:main", title: "🏠 Main Menu" },
-        { id: "catalog:search", title: "🔍 Search Again" }
-      ];
-      
-      await this.sendInteractiveButtons(
-        userPhone,
-        message,
-        buttons,
-        "Product Actions"
-      );
-    } catch (error) {
-      console.error("Error sending product details:", error);
-      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the product details. Please try again.");
-    }
-  }
-  
-  // Get stock status for a product
-  private getStockStatus(product: any): string {
-    const available = product.stockAvailable || 0;
-    const minLevel = product.minStockLevel || 10;
-    
-    if (available === 0) return "Out of Stock";
-    if (available <= minLevel) return "Low Stock";
-    return "In Stock";
-  }
-  
-  // Send search interface
-  private async sendSearchInterface(userPhone: string): Promise<void> {
-    const message = `🔍 **Search Products**\n\n` +
-      `**Search Options:**\n` +
-      `• Type product name (e.g., "sensor")\n` +
-      `• Type SKU code (e.g., "Q-002032")\n` +
-      `• Type partial name (e.g., "carrier")\n\n` +
-      `**Quick Filters:**\n` +
-      `• "low" - Show low stock items\n` +
-      `• "out" - Show out of stock items\n` +
-      `• "new" - Show recently added\n\n` +
-      `Type your search query:`;
-    
-    await this.sendWhatsAppMessage(userPhone, message);
-  }
-  
-  // Send products by category
-  private async sendProductsByCategory(userPhone: string, category: string): Promise<void> {
-    try {
-      const products = await storage.getProducts({ category });
-      const productsWithStock = products.filter(p => p.stockAvailable > 0);
-      const lowStockProducts = products.filter(p => p.stockAvailable > 0 && p.stockAvailable <= (p.minStockLevel || 10));
-      const outOfStockProducts = products.filter(p => p.stockAvailable === 0);
-      
-      if (products.length === 0) {
-        await this.sendWhatsAppMessage(userPhone, `❌ No products found in category "${category}".`);
-        return;
-      }
-      
-      // Create product rows for interactive list (max 10 due to WhatsApp limits)
-      const productRows = products.slice(0, 10).map(product => {
-        const stockStatus = this.getStockStatus(product);
-        const stockIcon = this.getStockIcon(product);
-        const title = `${stockIcon} ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
-        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}`;
-        
-        return {
-          id: `product:view:${product.id}`,
-          title,
-          description
-        };
-      });
-      
-      const message = `📦 **${category} Products**\n\n` +
-        `**Total:** ${products.length} products\n` +
-        `**In Stock:** ${productsWithStock.length}\n` +
-        `**Low Stock:** ${lowStockProducts.length}\n` +
-        `**Out of Stock:** ${outOfStockProducts.length}\n\n` +
-        `Select a product to view details:`;
-      
-      await this.sendInteractiveList(
-        userPhone,
-        message,
-        productRows,
-        "Select Product",
-        category
-      );
-    } catch (error) {
-      console.error("Error sending products by category:", error);
-      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the products. Please try again.");
-    }
-  }
-  
-  // Send all products with pagination
-  private async sendAllProducts(userPhone: string, page: number = 0): Promise<void> {
-    try {
-      const products = await storage.getProducts({});
-      const pageSize = 10;
-      const startIndex = page * pageSize;
-      const endIndex = startIndex + pageSize;
-      const pageProducts = products.slice(startIndex, endIndex);
-      
-      if (pageProducts.length === 0) {
-        await this.sendWhatsAppMessage(userPhone, "❌ No products found.");
-        return;
-      }
-      
-      const productRows = pageProducts.map(product => {
-        const stockStatus = this.getStockStatus(product);
-        const stockIcon = this.getStockIcon(product);
-        const title = `${stockIcon} ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
-        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}`;
-        
-        return {
-          id: `product:view:${product.id}`,
-          title,
-          description
-        };
-      });
-      
-      const message = `📋 **All Products** (Page ${page + 1})\n\n` +
-        `**Showing:** ${startIndex + 1}-${Math.min(endIndex, products.length)} of ${products.length}\n\n` +
-        `Select a product to view details:`;
-      
-      const buttons = [];
-      if (page > 0) buttons.push({ id: `catalog:all:${page - 1}`, title: "⬅️ Previous" });
-      if (endIndex < products.length) buttons.push({ id: `catalog:all:${page + 1}`, title: "Next ➡️" });
-      buttons.push({ id: "catalog:main", title: "🏠 Main Menu" });
-      
-      await this.sendInteractiveList(
-        userPhone,
-        message,
-        productRows,
-        "Select Product",
-        "All Products"
-      );
-      
-      if (buttons.length > 0) {
-        await this.sendInteractiveButtons(
-          userPhone,
-          "",
-          buttons,
-          "Navigation"
-        );
-      }
-    } catch (error) {
-      console.error("Error sending all products:", error);
-      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the products. Please try again.");
-    }
-  }
-  
-  // Send low stock products
-  private async sendLowStockProducts(userPhone: string): Promise<void> {
-    try {
-      const products = await storage.getProducts({});
-      const lowStockProducts = products.filter(p => 
-        p.stockAvailable > 0 && p.stockAvailable <= (p.minStockLevel || 10)
-      );
-      
-      if (lowStockProducts.length === 0) {
-        await this.sendWhatsAppMessage(userPhone, "✅ No low stock products found. All products are well stocked!");
-        return;
-      }
-      
-      const productRows = lowStockProducts.slice(0, 10).map(product => {
-        const title = `⚠️ ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
-        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}/${product.minStockLevel || 10}`;
-        
-        return {
-          id: `product:view:${product.id}`,
-          title,
-          description
-        };
-      });
-      
-      const message = `⚠️ **Low Stock Products**\n\n` +
-        `**Found:** ${lowStockProducts.length} products below minimum stock level\n\n` +
-        `Select a product to view details:`;
-      
-      await this.sendInteractiveList(
-        userPhone,
-        message,
-        productRows,
-        "Select Product",
-        "Low Stock"
-      );
-    } catch (error) {
-      console.error("Error sending low stock products:", error);
-      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the low stock products. Please try again.");
-    }
-  }
-  
-  // Send out of stock products
-  private async sendOutOfStockProducts(userPhone: string): Promise<void> {
-    try {
-      const products = await storage.getProducts({});
-      const outOfStockProducts = products.filter(p => p.stockAvailable === 0);
-      
-      if (outOfStockProducts.length === 0) {
-        await this.sendWhatsAppMessage(userPhone, "✅ No out of stock products found. All products are available!");
-        return;
-      }
-      
-      const productRows = outOfStockProducts.slice(0, 10).map(product => {
-        const title = `❌ ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
-        const description = `SKU: ${product.sku} | Last Stock: ${product.stockTotal || 0}`;
-        
-        return {
-          id: `product:view:${product.id}`,
-          title,
-          description
-        };
-      });
-      
-      const message = `❌ **Out of Stock Products**\n\n` +
-        `**Found:** ${outOfStockProducts.length} products with zero stock\n\n` +
-        `Select a product to view details:`;
-      
-      await this.sendInteractiveList(
-        userPhone,
-        message,
-        productRows,
-        "Select Product",
-        "Out of Stock"
-      );
-    } catch (error) {
-      console.error("Error sending out of stock products:", error);
-      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the out of stock products. Please try again.");
+      await this.sendSmartSearchSuggestions(userPhone, message);
+      return "";
     }
   }
   
@@ -2361,6 +2051,442 @@ export class EnhancedWhatsAppService {
       "Choose an action"
     );
   }
+
+  // Enhanced Check Stock Methods
+  
+  // Send check stock main menu
+  private async sendCheckStockMainMenu(userPhone: string): Promise<void> {
+    try {
+      const products = await storage.getProducts({});
+      const categories = await this.getProductCategories();
+      const lowStockCount = products.filter(p => p.stockAvailable > 0 && p.stockAvailable <= (p.minStockLevel || 10)).length;
+      const outOfStockCount = products.filter(p => p.stockAvailable === 0).length;
+      
+      const message = `📦 **Stock Management Hub**\n\n` +
+        `**Total Products:** ${products.length}\n` +
+        `**Categories:** ${categories.length}\n` +
+        `**Low Stock:** ${lowStockCount} items\n` +
+        `**Out of Stock:** ${outOfStockCount} items\n\n` +
+        `How would you like to check stock?`;
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        message,
+        [
+          { id: "check:search", title: "🔍 Search Products" },
+          { id: "check:categories", title: "📂 Browse Categories" },
+          { id: "check:low_stock", title: `⚠️ Low Stock (${lowStockCount})` },
+          { id: "check:out_of_stock", title: `❌ Out of Stock (${outOfStockCount})` },
+          { id: "check:all_products", title: "📋 All Products" }
+        ],
+        "Stock Management",
+        "Choose an option"
+      );
+    } catch (error) {
+      console.error("Error sending check stock main menu:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the stock information. Please try again.");
+    }
+  }
+
+  // Send search interface
+  private async sendSearchInterface(userPhone: string): Promise<void> {
+    const message = `🔍 **Search Products**\n\n` +
+      `**Search Options:**\n` +
+      `• Type product name (e.g., "sensor")\n` +
+      `• Type SKU code (e.g., "Q-002032")\n` +
+      `• Type partial name (e.g., "carrier")\n` +
+      `• Type category name (e.g., "sensor")\n\n` +
+      `**Quick Filters:**\n` +
+      `• "low" - Show low stock items\n` +
+      `• "out" - Show out of stock items\n` +
+      `• "all" - Show all products\n\n` +
+      `Type your search query:`;
+    
+    await this.sendWhatsAppMessage(userPhone, message);
+  }
+
+  // Send category menu
+  private async sendCategoryMenu(userPhone: string): Promise<void> {
+    try {
+      const categories = await this.getProductCategories();
+      
+      if (categories.length === 0) {
+        await this.sendWhatsAppMessage(userPhone, "❌ No categories found.");
+        return;
+      }
+      
+      const categoryButtons = categories.slice(0, 3).map(cat => ({
+        id: `check:category:${cat.name}`,
+        title: `${cat.name} (${cat.count})`
+      }));
+      
+      const message = `📂 **Product Categories**\n\n` +
+        `**Available Categories:** ${categories.length}\n\n` +
+        `Select a category to view products:`;
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        message,
+        categoryButtons,
+        "Categories"
+      );
+    } catch (error) {
+      console.error("Error sending category menu:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the categories. Please try again.");
+    }
+  }
+
+  // Send product search results with interactive buttons
+  private async sendProductSearchResults(userPhone: string, products: any[], query: string): Promise<void> {
+    try {
+      const topProducts = products.slice(0, 10);
+      const productRows = topProducts.map(product => {
+        const stockStatus = this.getStockStatus(product);
+        const stockIcon = this.getStockIcon(product);
+        const title = `${stockIcon} ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
+        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}`;
+        
+        return {
+          id: `check:product:${product.id}`,
+          title,
+          description
+        };
+      });
+      
+      const message = `🔍 **Search Results for "${query}"**\n\n` +
+        `**Found:** ${products.length} products\n` +
+        `**Showing:** Top ${topProducts.length} results\n\n` +
+        `Select a product to view details:`;
+      
+      await this.sendInteractiveList(
+        userPhone,
+        message,
+        productRows,
+        "Select Product",
+        "Search Results"
+      );
+    } catch (error) {
+      console.error("Error sending product search results:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't display the search results. Please try again.");
+    }
+  }
+
+  // Send smart search suggestions
+  private async sendSmartSearchSuggestions(userPhone: string, query: string): Promise<void> {
+    try {
+      const categories = await this.getProductCategories();
+      const products = await storage.getProducts({});
+      
+      // Find similar product names
+      const similarProducts = products.filter(p => 
+        p.name.toLowerCase().includes(query.toLowerCase()) ||
+        p.sku.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 5);
+      
+      // Find similar categories
+      const similarCategories = categories.filter(cat =>
+        cat.name.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 3);
+      
+      let message = `❌ **No exact matches found for "${query}"**\n\n`;
+      
+      if (similarProducts.length > 0) {
+        message += `**Similar Products:**\n`;
+        similarProducts.forEach((p, i) => {
+          message += `${i + 1}. ${p.name} (SKU: ${p.sku})\n`;
+        });
+        message += `\n`;
+      }
+      
+      if (similarCategories.length > 0) {
+        message += `**Similar Categories:**\n`;
+        similarCategories.forEach((cat, i) => {
+          message += `${i + 1}. ${cat.name} (${cat.count} products)\n`;
+        });
+        message += `\n`;
+      }
+      
+      message += `**Try these suggestions:**\n` +
+        `• Use partial names: "sensor" instead of "carrier data recorder sensor"\n` +
+        `• Use SKU codes: "Q-002032"\n` +
+        `• Use broader terms: "plug", "cable", "sensor"\n` +
+        `• Type "low" for low stock items\n` +
+        `• Type "out" for out of stock items\n` +
+        `• Type "all" to see all products`;
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        message,
+        [
+          { id: "check:search", title: "🔍 Search Again" },
+          { id: "check:categories", title: "📂 Browse Categories" },
+          { id: "check:all_products", title: "📋 All Products" },
+          { id: "check:back_to_menu", title: "🏠 Main Menu" }
+        ],
+        "Search Suggestions"
+      );
+    } catch (error) {
+      console.error("Error sending smart search suggestions:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't provide suggestions. Please try again.");
+    }
+  }
+
+  // Send all products list
+  private async sendAllProductsList(userPhone: string): Promise<void> {
+    try {
+      const products = await storage.getProducts({});
+      const pageSize = 10;
+      const pageProducts = products.slice(0, pageSize);
+      
+      if (pageProducts.length === 0) {
+        await this.sendWhatsAppMessage(userPhone, "❌ No products found.");
+        return;
+      }
+      
+      const productRows = pageProducts.map(product => {
+        const stockStatus = this.getStockStatus(product);
+        const stockIcon = this.getStockIcon(product);
+        const title = `${stockIcon} ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
+        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}`;
+        
+        return {
+          id: `check:product:${product.id}`,
+          title,
+          description
+        };
+      });
+      
+      const message = `📋 **All Products**\n\n` +
+        `**Total:** ${products.length} products\n` +
+        `**Showing:** 1-${pageProducts.length} of ${products.length}\n\n` +
+        `Select a product to view details:`;
+      
+      await this.sendInteractiveList(
+        userPhone,
+        message,
+        productRows,
+        "Select Product",
+        "All Products"
+      );
+    } catch (error) {
+      console.error("Error sending all products list:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the products. Please try again.");
+    }
+  }
+
+  // Send products by category
+  private async sendProductsByCategory(userPhone: string, category: string): Promise<void> {
+    try {
+      const products = await storage.getProducts({ category });
+      const productsWithStock = products.filter(p => p.stockAvailable > 0);
+      const lowStockProducts = products.filter(p => p.stockAvailable > 0 && p.stockAvailable <= (p.minStockLevel || 10));
+      const outOfStockProducts = products.filter(p => p.stockAvailable === 0);
+      
+      if (products.length === 0) {
+        await this.sendWhatsAppMessage(userPhone, `❌ No products found in category "${category}".`);
+        return;
+      }
+      
+      // Create product rows for interactive list (max 10 due to WhatsApp limits)
+      const productRows = products.slice(0, 10).map(product => {
+        const stockStatus = this.getStockStatus(product);
+        const stockIcon = this.getStockIcon(product);
+        const title = `${stockIcon} ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
+        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}`;
+        
+        return {
+          id: `check:product:${product.id}`,
+          title,
+          description
+        };
+      });
+      
+      const message = `📦 **${category} Products**\n\n` +
+        `**Total:** ${products.length} products\n` +
+        `**In Stock:** ${productsWithStock.length}\n` +
+        `**Low Stock:** ${lowStockProducts.length}\n` +
+        `**Out of Stock:** ${outOfStockProducts.length}\n\n` +
+        `Select a product to view details:`;
+      
+      await this.sendInteractiveList(
+        userPhone,
+        message,
+        productRows,
+        "Select Product",
+        category
+      );
+    } catch (error) {
+      console.error("Error sending products by category:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the products. Please try again.");
+    }
+  }
+
+  // Send low stock products
+  private async sendLowStockProducts(userPhone: string): Promise<void> {
+    try {
+      const products = await storage.getProducts({});
+      const lowStockProducts = products.filter(p => 
+        p.stockAvailable > 0 && p.stockAvailable <= (p.minStockLevel || 10)
+      );
+      
+      if (lowStockProducts.length === 0) {
+        await this.sendWhatsAppMessage(userPhone, "✅ No low stock products found. All products are well stocked!");
+        return;
+      }
+      
+      const productRows = lowStockProducts.slice(0, 10).map(product => {
+        const title = `⚠️ ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
+        const description = `SKU: ${product.sku} | Stock: ${product.stockAvailable}/${product.minStockLevel || 10}`;
+        
+        return {
+          id: `check:product:${product.id}`,
+          title,
+          description
+        };
+      });
+      
+      const message = `⚠️ **Low Stock Products**\n\n` +
+        `**Found:** ${lowStockProducts.length} products below minimum stock level\n\n` +
+        `Select a product to view details:`;
+      
+      await this.sendInteractiveList(
+        userPhone,
+        message,
+        productRows,
+        "Select Product",
+        "Low Stock"
+      );
+    } catch (error) {
+      console.error("Error sending low stock products:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the low stock products. Please try again.");
+    }
+  }
+
+  // Send out of stock products
+  private async sendOutOfStockProducts(userPhone: string): Promise<void> {
+    try {
+      const products = await storage.getProducts({});
+      const outOfStockProducts = products.filter(p => p.stockAvailable === 0);
+      
+      if (outOfStockProducts.length === 0) {
+        await this.sendWhatsAppMessage(userPhone, "✅ No out of stock products found. All products are available!");
+        return;
+      }
+      
+      const productRows = outOfStockProducts.slice(0, 10).map(product => {
+        const title = `❌ ${product.name.substring(0, 20)}${product.name.length > 20 ? '...' : ''}`;
+        const description = `SKU: ${product.sku} | Last Stock: ${product.stockTotal || 0}`;
+        
+        return {
+          id: `check:product:${product.id}`,
+          title,
+          description
+        };
+      });
+      
+      const message = `❌ **Out of Stock Products**\n\n` +
+        `**Found:** ${outOfStockProducts.length} products with zero stock\n\n` +
+        `Select a product to view details:`;
+      
+      await this.sendInteractiveList(
+        userPhone,
+        message,
+        productRows,
+        "Select Product",
+        "Out of Stock"
+      );
+    } catch (error) {
+      console.error("Error sending out of stock products:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the out of stock products. Please try again.");
+    }
+  }
+
+  // Send detailed product view
+  private async sendProductDetails(userPhone: string, productId: string): Promise<void> {
+    try {
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        await this.sendWhatsAppMessage(userPhone, "❌ Product not found.");
+        return;
+      }
+      
+      const stockStatus = this.getStockStatus(product);
+      const stockIcon = this.getStockIcon(product);
+      
+      const message = `📊 **${product.name}**\n\n` +
+        `**SKU:** ${product.sku}\n` +
+        `**Type:** ${product.type || 'N/A'}\n` +
+        `**Status:** ${stockIcon} ${stockStatus}\n\n` +
+        `📈 **Stock Information:**\n` +
+        `• Available: ${product.stockAvailable || 0} units\n` +
+        `• Total: ${product.stockTotal || 0} units\n` +
+        `• Used: ${product.stockUsed || 0} units\n` +
+        `• Min Level: ${product.minStockLevel || 0} units\n\n` +
+        `💰 **Price:** $${product.price || 0}\n` +
+        `📦 **Group:** ${product.groupName || 'N/A'}\n` +
+        `🏷️ **Part Code:** ${product.crystalPartCode || 'N/A'}\n\n` +
+        `**What would you like to do?**`;
+      
+      const buttons = [
+        { id: `product:add:${product.id}`, title: "➕ Add Stock" },
+        { id: `product:order:${product.id}`, title: "🛒 Create Order" },
+        { id: "check:back_to_menu", title: "🏠 Main Menu" },
+        { id: "check:search", title: "🔍 Search Again" }
+      ];
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        message,
+        buttons,
+        "Product Actions"
+      );
+    } catch (error) {
+      console.error("Error sending product details:", error);
+      await this.sendWhatsAppMessage(userPhone, "Sorry, I couldn't load the product details. Please try again.");
+    }
+  }
+
+  // Get product categories with counts
+  private async getProductCategories(): Promise<Array<{name: string, count: number, type: string}>> {
+    try {
+      const products = await storage.getProducts({});
+      const categoryMap = new Map<string, number>();
+      
+      products.forEach(product => {
+        if (product.type) {
+          const count = categoryMap.get(product.type) || 0;
+          categoryMap.set(product.type, count + 1);
+        }
+      });
+      
+      return Array.from(categoryMap.entries())
+        .map(([type, count]) => ({ name: type, count, type }))
+        .sort((a, b) => b.count - a.count);
+    } catch (error) {
+      console.error("Error getting product categories:", error);
+      return [];
+    }
+  }
+
+  // Get stock icon for a product
+  private getStockIcon(product: any): string {
+    const available = product.stockAvailable || 0;
+    const minLevel = product.minStockLevel || 10;
+    
+    if (available === 0) return "❌";
+    if (available <= minLevel) return "⚠️";
+    return "✅";
+  }
+
+  // Get stock status for a product
+  private getStockStatus(product: any): string {
+    const available = product.stockAvailable || 0;
+    const minLevel = product.minStockLevel || 10;
+    
+    if (available === 0) return "Out of Stock";
+    if (available <= minLevel) return "Low Stock";
+    return "In Stock";
+  }
   
   // Process incoming webhook
   async processIncomingMessage(messageData: any): Promise<void> {
@@ -2508,52 +2634,51 @@ export class EnhancedWhatsAppService {
       if (id === "main:check_stock") {
         // Set flow state for check stock
         state.currentFlow = 'checking_stock';
-        await this.sendCatalogMainMenu(userPhone);
+        await this.sendCheckStockMainMenu(userPhone);
         return;
       }
 
-      // Catalog system handlers
-      if (id === "catalog:main") {
-        state.currentFlow = 'checking_stock';
-        await this.sendCatalogMainMenu(userPhone);
-        return;
-      }
-      if (id === "catalog:search") {
+      // Enhanced Check Stock handlers
+      if (id === "check:search") {
         state.currentFlow = 'checking_stock';
         await this.sendSearchInterface(userPhone);
         return;
       }
-      if (id === "catalog:all") {
+      if (id === "check:categories") {
         state.currentFlow = 'checking_stock';
-        await this.sendAllProducts(userPhone);
+        await this.sendCategoryMenu(userPhone);
         return;
       }
-      if (id === "catalog:low_stock") {
+      if (id === "check:low_stock") {
         state.currentFlow = 'checking_stock';
         await this.sendLowStockProducts(userPhone);
         return;
       }
-      if (id === "catalog:out_of_stock") {
+      if (id === "check:out_of_stock") {
         state.currentFlow = 'checking_stock';
         await this.sendOutOfStockProducts(userPhone);
         return;
       }
-      if (id.startsWith("catalog:category:")) {
+      if (id === "check:all_products") {
+        state.currentFlow = 'checking_stock';
+        await this.sendAllProductsList(userPhone);
+        return;
+      }
+      if (id.startsWith("check:category:")) {
         const category = id.split(":")[2];
         state.currentFlow = 'checking_stock';
         await this.sendProductsByCategory(userPhone, category);
         return;
       }
-      if (id.startsWith("catalog:all:")) {
-        const page = parseInt(id.split(":")[2]) || 0;
-        state.currentFlow = 'checking_stock';
-        await this.sendAllProducts(userPhone, page);
-        return;
-      }
-      if (id.startsWith("product:view:")) {
+      if (id.startsWith("check:product:")) {
         const productId = id.split(":")[2];
         state.currentFlow = 'checking_stock';
         await this.sendProductDetails(userPhone, productId);
+        return;
+      }
+      if (id === "check:back_to_menu") {
+        state.currentFlow = 'checking_stock';
+        await this.sendCheckStockMainMenu(userPhone);
         return;
       }
 
