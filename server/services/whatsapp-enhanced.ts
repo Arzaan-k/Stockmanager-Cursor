@@ -560,6 +560,8 @@ export class EnhancedWhatsAppService {
       }
       
       case 'collecting_items': {
+        console.log('Processing collecting_items step:', { message, orderItems: order.items.length });
+        
         // Check if user wants to proceed with collected items
         if (order.items.length > 0 && /^(yes|y|done|proceed|next)$/i.test(message.trim())) {
           // Validate that we have items
@@ -575,7 +577,24 @@ export class EnhancedWhatsAppService {
         }
         
         // Try to extract product and quantity
-        const { product, quantity } = await this.extractProductAndQuantity(message);
+        const { product, quantity, products } = await this.extractProductAndQuantity(message);
+        console.log('Product extraction result:', { product: product?.name, quantity, productsCount: products?.length });
+        
+        // If multiple products found, show selection buttons
+        if (products && products.length > 1) {
+          // Store the context for product selection
+          state.lastContext = {
+            type: 'product_selection',
+            productQuery: message,
+            quantity: quantity || 1,
+            action: 'create_order',
+            products: products
+          };
+
+          // Send product selection buttons
+          await this.sendProductSelectionButtons(userPhone, products, quantity || 1, 'create_order');
+          return "";
+        }
         
         if (product && quantity) {
           // Check stock availability
@@ -627,6 +646,12 @@ export class EnhancedWhatsAppService {
             "Order actions"
           );
           return "";
+        }
+        
+        // If no product found, show helpful message
+        if (!product && !products?.length) {
+          return `❌ No products found matching your request. Please try a different product name.\n\n` +
+                 `Example: "10 units of socket plugs"`;
         }
         
         await this.sendInteractiveButtons(
@@ -1209,6 +1234,7 @@ export class EnhancedWhatsAppService {
       } else if (state.currentFlow === 'creating_order' || 
                  state.currentFlow === 'collecting_order_details' ||
                  state.pendingOrder) {
+        console.log('Processing as create order flow');
         response = await this.handleOrderCreation(userPhone, message, state);
       } else if (state.pendingImageProcessing?.awaitingProductSelection) {
         response = await this.handleProductSelection(userPhone, message, state);
