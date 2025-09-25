@@ -112,7 +112,7 @@ export class EnhancedWhatsAppService {
 
   // Parse user intent from message
   private async detectIntent(message: string, state: ConversationState): Promise<{
-    intent: 'add_stock' | 'create_order' | 'check_stock' | 'select_product' | 'unknown';
+    intent: 'add_stock' | 'create_order' | 'check_stock' | 'select_product' | 'list_products' | 'unknown';
     confidence: number;
   }> {
     const msg = message.toLowerCase().trim();
@@ -138,6 +138,11 @@ export class EnhancedWhatsAppService {
     // Check for product selection (from image recognition results)
     if (state.pendingImageProcessing?.awaitingProductSelection && /^\d+$/.test(msg.trim())) {
       return { intent: 'select_product', confidence: 0.9 };
+    }
+    
+    // Check for list products request
+    if (/\b(list|show|all|products?|inventory|catalog)\b/i.test(msg)) {
+      return { intent: 'list_products', confidence: 0.8 };
     }
     
     return { intent: 'unknown', confidence: 0 };
@@ -1435,18 +1440,31 @@ export class EnhancedWhatsAppService {
         return await this.handleProductSelection(userPhone, message, state);
         
       case 'check_stock': {
-        const { product } = await this.extractProductAndQuantity(message);
-        if (product) {
-          const stockInfo = `📊 *${product.name}*\n` +
+        const { product, products } = await this.extractProductAndQuantity(message);
+        
+        // If multiple products found, show them with stock levels
+        if (products && products.length > 1) {
+          const stockList = products.slice(0, 10).map((p, i) => 
+            `${i + 1}. **${p.name}** (SKU: ${p.sku})\n   Available: ${p.stockAvailable || 0} | Total: ${p.stockTotal || 0} | Price: $${p.price || 0}`
+          ).join('\n\n');
+          
+          const response = `📦 **Found ${products.length} products matching "${message}":**\n\n${stockList}${products.length > 10 ? `\n\n... and ${products.length - 10} more products` : ''}\n\n**To check specific product:** Type the exact product name or SKU.`;
+          
+          await this.sendWhatsAppMessage(userPhone, response);
+          return "";
+        }
+        // If single product found, show detailed info
+        else if (product) {
+          const stockInfo = `📊 **${product.name}**\n` +
             `SKU: ${product.sku}\n` +
             `Type: ${product.type || 'N/A'}\n\n` +
-            `📈 Stock Levels:\n` +
+            `📈 **Stock Levels:**\n` +
             `• Available: ${product.stockAvailable || 0} units\n` +
             `• Total: ${product.stockTotal || 0} units\n` +
             `• Used: ${product.stockUsed || 0} units\n` +
             `• Min Level: ${product.minStockLevel || 0} units\n\n` +
-            `💰 Price: $${product.price || 0}\n\n` +
-            `What would you like to do?`;
+            `💰 **Price:** $${product.price || 0}\n\n` +
+            `**What would you like to do?**`;
           
           await this.sendInteractiveButtons(
             userPhone,
@@ -1459,10 +1477,37 @@ export class EnhancedWhatsAppService {
             "Stock Info"
           );
           return "";
-        } else {
-          await this.sendMainMenu(userPhone);
+        } 
+        // If no products found, provide helpful suggestions
+        else {
+          const suggestions = `❌ **No products found matching "${message}"**\n\n` +
+            `**Try these suggestions:**\n` +
+            `• Use partial names: "sensor" instead of "carrier data recorder sensor"\n` +
+            `• Use SKU codes: "Q-002032"\n` +
+            `• Use broader terms: "plug", "cable", "sensor"\n\n` +
+            `**Or type "list" to see all available products.**`;
+          
+          await this.sendWhatsAppMessage(userPhone, suggestions);
           return "";
         }
+      }
+        
+      case 'list_products': {
+        const products = await storage.getProducts({});
+        if (products.length === 0) {
+          await this.sendWhatsAppMessage(userPhone, "❌ No products found in inventory.");
+          return "";
+        }
+        
+        // Show first 20 products with basic info
+        const productList = products.slice(0, 20).map((p, i) => 
+          `${i + 1}. **${p.name}** (SKU: ${p.sku}) - Stock: ${p.stockAvailable || 0} | Price: $${p.price || 0}`
+        ).join('\n');
+        
+        const response = `📦 **All Products (${products.length} total):**\n\n${productList}${products.length > 20 ? `\n\n... and ${products.length - 20} more products` : ''}\n\n**To check specific product:** Type the product name or SKU.`;
+        
+        await this.sendWhatsAppMessage(userPhone, response);
+        return "";
       }
         
       default:
@@ -2093,18 +2138,16 @@ export class EnhancedWhatsAppService {
         return;
       }
       if (id === "main:check_stock") {
-        // Offer product list to check - show all products
-        const products = await storage.getProducts({});
-        const rows = products.map(p => ({ 
-          id: `product:check:${p.id}`, 
-          title: p.name.length > 24 ? p.name.substring(0, 21) + '...' : p.name, 
-          description: `SKU: ${p.sku}` 
-        }));
-        if (rows.length) {
-          await this.sendInteractiveList(userPhone, `Choose a product to view stock (${products.length} products available):`, rows, "Select", "Products");
-        } else {
-          await this.sendWhatsAppMessage(userPhone, "No products found.");
-        }
+        // Use text-based product identification instead of interactive list
+        await this.sendWhatsAppMessage(userPhone, 
+          "📦 **Check Stock**\n\n" +
+          "Please type the product name or SKU to check stock.\n\n" +
+          "**Examples:**\n" +
+          "• \"sensor\" - to find all sensor products\n" +
+          "• \"Q-002032\" - to check specific SKU\n" +
+          "• \"socket plug\" - to find socket products\n\n" +
+          "I'll search and show you the stock levels!"
+        );
         return;
       }
 
