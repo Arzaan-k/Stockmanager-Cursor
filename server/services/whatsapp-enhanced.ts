@@ -1282,7 +1282,19 @@ export class EnhancedWhatsAppService {
           pendingStockAddition: !!state.pendingStockAddition,
           currentFlow: state.currentFlow,
           awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
-          userName: state.userName
+          userName: state.userName,
+          message: message
+        });
+        response = await this.handleStockAddition(userPhone, message, state);
+      }
+      // Additional check for stock addition flow - if we have a pending stock addition but it's not being caught above
+      else if (state.pendingStockAddition && !state.pendingStockAddition.awaitingConfirmation && !state.userName) {
+        console.log('Processing as stock addition flow (fallback) - state:', {
+          pendingStockAddition: !!state.pendingStockAddition,
+          currentFlow: state.currentFlow,
+          awaitingConfirmation: state.pendingStockAddition?.awaitingConfirmation,
+          userName: state.userName,
+          message: message
         });
         response = await this.handleStockAddition(userPhone, message, state);
       } else if (state.currentFlow === 'creating_order' || 
@@ -1293,6 +1305,12 @@ export class EnhancedWhatsAppService {
       } else if (state.pendingImageProcessing?.awaitingProductSelection) {
         response = await this.handleProductSelection(userPhone, message, state);
       } else {
+        console.log('Falling through to normal intent detection - state:', {
+          pendingStockAddition: !!state.pendingStockAddition,
+          currentFlow: state.currentFlow,
+          lastContextType: state.lastContext?.type,
+          message: message
+        });
         // Check if this is a follow-up to product identification
         if (state.lastContext?.type === 'product_identified') {
           const contextResponse = await this.handleProductContextMessage(userPhone, message, state);
