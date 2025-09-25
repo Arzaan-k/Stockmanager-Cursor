@@ -1396,15 +1396,26 @@ export class EnhancedWhatsAppService {
       case 'check_stock': {
         const { product } = await this.extractProductAndQuantity(message);
         if (product) {
+          const stockInfo = `📊 *${product.name}*\n` +
+            `SKU: ${product.sku}\n` +
+            `Type: ${product.type || 'N/A'}\n\n` +
+            `📈 Stock Levels:\n` +
+            `• Available: ${product.stockAvailable || 0} units\n` +
+            `• Total: ${product.stockTotal || 0} units\n` +
+            `• Used: ${product.stockUsed || 0} units\n` +
+            `• Min Level: ${product.minStockLevel || 0} units\n\n` +
+            `💰 Price: $${product.price || 0}\n\n` +
+            `What would you like to do?`;
+          
           await this.sendInteractiveButtons(
             userPhone,
-            `📦 ${product.name} (SKU: ${product.sku})\nAvailable: ${product.stockAvailable || 0} • Total: ${product.stockTotal || 0} • Used: ${product.stockUsed || 0}`,
+            stockInfo,
             [
               { id: `product:add:${product.id}`, title: "Add Stock" },
               { id: `product:order:${product.id}`, title: "Create Order" },
-              { id: `product:check:${product.id}`, title: "More Info" }
+              { id: "main:check_stock", title: "Check Another" }
             ],
-            "Stock info"
+            "Stock Info"
           );
           return "";
         } else {
@@ -1804,8 +1815,8 @@ export class EnhancedWhatsAppService {
     action: string
   ): Promise<void> {
     try {
-      // Create buttons for each product (max 3 for WhatsApp)
-      const buttons = products.slice(0, 3).map((product, index) => {
+      // Create buttons for each product (max 5 for WhatsApp)
+      const buttons = products.slice(0, 5).map((product, index) => {
         const buttonId = `select_product_${product.id}_${action}_${quantity}`;
         console.log(`Creating button ${index + 1}:`, {
           productId: product.id,
@@ -1837,7 +1848,7 @@ export class EnhancedWhatsAppService {
       // Fallback to text message
       const textMessage = `Found ${products.length} products. Please reply with the number:\n\n${products.map((p, i) => 
         `${i + 1}. ${p.name} (SKU: ${p.sku}) - Stock: ${p.stockAvailable}`
-      ).join('\n')}\n\nReply with the number (1-${Math.min(products.length, 3)}) to select.`;
+      ).join('\n')}\n\nReply with the number (1-${Math.min(products.length, 5)}) to select.`;
       await this.sendWhatsAppMessage(to, textMessage);
     }
   }
@@ -1883,9 +1894,6 @@ export class EnhancedWhatsAppService {
 
   // Send Main Menu quick actions
   private async sendMainMenu(to: string): Promise<void> {
-    const products = await storage.getProducts({});
-    const topProducts = products.slice(0, 3);
-    const productButtons = topProducts.map(p => ({ id: `product:check:${p.id}`, title: p.name.substring(0, 20) }));
     await this.sendInteractiveButtons(
       to,
       "How can I help you today?",
@@ -1897,15 +1905,6 @@ export class EnhancedWhatsAppService {
       "StockSmartHub",
       "Choose an action"
     );
-    if (productButtons.length > 0) {
-      await this.sendInteractiveButtons(
-        to,
-        "Quick products",
-        productButtons,
-        "Popular",
-        "Tap to view"
-      );
-    }
   }
   
   // Process incoming webhook
@@ -2092,8 +2091,27 @@ export class EnhancedWhatsAppService {
         const productId = id.split(":")[2];
         const product = await storage.getProduct(productId);
         if (product) {
-          await this.sendWhatsAppMessage(userPhone,
-            `📦 ${product.name} (SKU: ${product.sku})\nAvailable: ${product.stockAvailable || 0} | Total: ${product.stockTotal || 0}`);
+          const stockInfo = `📊 *${product.name}*\n` +
+            `SKU: ${product.sku}\n` +
+            `Type: ${product.type || 'N/A'}\n\n` +
+            `📈 Stock Levels:\n` +
+            `• Available: ${product.stockAvailable || 0} units\n` +
+            `• Total: ${product.stockTotal || 0} units\n` +
+            `• Used: ${product.stockUsed || 0} units\n` +
+            `• Min Level: ${product.minStockLevel || 0} units\n\n` +
+            `💰 Price: $${product.price || 0}\n\n` +
+            `What would you like to do?`;
+          
+          await this.sendInteractiveButtons(
+            userPhone,
+            stockInfo,
+            [
+              { id: `product:add:${product.id}`, title: "Add Stock" },
+              { id: `product:order:${product.id}`, title: "Create Order" },
+              { id: "main:check_stock", title: "Check Another" }
+            ],
+            "Stock Info"
+          );
         } else {
           await this.sendWhatsAppMessage(userPhone, "❌ Product not found.");
         }
