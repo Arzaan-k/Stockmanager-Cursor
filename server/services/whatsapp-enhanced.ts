@@ -10,7 +10,7 @@ interface ConversationState {
   userId: string;
   userName?: string;
   userPhone: string;
-  currentFlow: 'idle' | 'awaiting_name' | 'adding_stock' | 'creating_order' | 'collecting_order_details' | 'awaiting_invoice';
+  currentFlow: 'idle' | 'awaiting_name' | 'adding_stock' | 'creating_order' | 'collecting_order_details' | 'awaiting_invoice' | 'checking_stock';
   
   // For stock addition flow
   pendingStockAddition?: {
@@ -1264,6 +1264,67 @@ export class EnhancedWhatsAppService {
     return "Action not supported. Please try again.";
   }
   
+  // Handle check stock flow
+  private async handleCheckStock(userPhone: string, message: string, state: ConversationState): Promise<string> {
+    console.log('handleCheckStock called:', { message, currentFlow: state.currentFlow });
+    
+    const { product, products } = await this.extractProductAndQuantity(message);
+    
+    // If multiple products found, show them with stock levels
+    if (products && products.length > 1) {
+      const stockList = products.slice(0, 10).map((p, i) => 
+        `${i + 1}. **${p.name}** (SKU: ${p.sku})\n   Available: ${p.stockAvailable || 0} | Total: ${p.stockTotal || 0} | Price: $${p.price || 0}`
+      ).join('\n\n');
+      
+      const response = `📦 **Found ${products.length} products matching "${message}":**\n\n${stockList}${products.length > 10 ? `\n\n... and ${products.length - 10} more products` : ''}\n\n**To check specific product:** Type the exact product name or SKU.`;
+      
+      // Reset flow to allow new search
+      state.currentFlow = 'checking_stock';
+      return response;
+    }
+    // If single product found, show detailed info
+    else if (product) {
+      const stockInfo = `📊 **${product.name}**\n` +
+        `SKU: ${product.sku}\n` +
+        `Type: ${product.type || 'N/A'}\n\n` +
+        `📈 **Stock Levels:**\n` +
+        `• Available: ${product.stockAvailable || 0} units\n` +
+        `• Total: ${product.stockTotal || 0} units\n` +
+        `• Used: ${product.stockUsed || 0} units\n` +
+        `• Min Level: ${product.minStockLevel || 0} units\n\n` +
+        `💰 **Price:** $${product.price || 0}\n\n` +
+        `**What would you like to do?**`;
+      
+      await this.sendInteractiveButtons(
+        userPhone,
+        stockInfo,
+        [
+          { id: `product:add:${product.id}`, title: "Add Stock" },
+          { id: `product:order:${product.id}`, title: "Create Order" },
+          { id: "main:check_stock", title: "Check Another" }
+        ],
+        "Stock Info"
+      );
+      
+      // Reset flow to allow new search
+      state.currentFlow = 'checking_stock';
+      return "";
+    } 
+    // If no products found, provide helpful suggestions
+    else {
+      const suggestions = `❌ **No products found matching "${message}"**\n\n` +
+        `**Try these suggestions:**\n` +
+        `• Use partial names: "sensor" instead of "carrier data recorder sensor"\n` +
+        `• Use SKU codes: "Q-002032"\n` +
+        `• Use broader terms: "plug", "cable", "sensor"\n\n` +
+        `**Or type "list" to see all available products.**`;
+      
+      // Reset flow to allow new search
+      state.currentFlow = 'checking_stock';
+      return suggestions;
+    }
+  }
+  
   // Main message handler
   async handleTextMessage(userPhone: string, messageText: string): Promise<void> {
     try {
@@ -1321,6 +1382,9 @@ export class EnhancedWhatsAppService {
                  state.pendingOrder) {
         console.log('Processing as create order flow');
         response = await this.handleOrderCreation(userPhone, message, state);
+      } else if (state.currentFlow === 'checking_stock') {
+        console.log('Processing as check stock flow');
+        response = await this.handleCheckStock(userPhone, message, state);
       } else if (state.pendingImageProcessing?.awaitingProductSelection) {
         response = await this.handleProductSelection(userPhone, message, state);
       } else {
@@ -2138,7 +2202,8 @@ export class EnhancedWhatsAppService {
         return;
       }
       if (id === "main:check_stock") {
-        // Use text-based product identification instead of interactive list
+        // Set flow state for check stock
+        state.currentFlow = 'checking_stock';
         await this.sendWhatsAppMessage(userPhone, 
           "📦 **Check Stock**\n\n" +
           "Please type the product name or SKU to check stock.\n\n" +
