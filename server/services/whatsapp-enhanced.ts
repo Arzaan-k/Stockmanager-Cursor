@@ -1143,16 +1143,23 @@ export class EnhancedWhatsAppService {
       console.log('Processing create_order action');
       // Proceed with order creation
       state.currentFlow = 'creating_order';
-      state.pendingOrder = {
-        items: [{
-          productId,
-          productName: product.name,
-          sku: product.sku || 'NA',
-          quantity,
-          unitPrice: product.price
-        }],
-        step: 'collecting_items'
-      };
+      
+      // Initialize or add to existing order
+      if (!state.pendingOrder) {
+        state.pendingOrder = {
+          items: [],
+          step: 'collecting_items'
+        };
+      }
+      
+      // Add new item to existing order
+      state.pendingOrder.items.push({
+        productId,
+        productName: product.name,
+        sku: product.sku || 'NA',
+        quantity,
+        unitPrice: product.price
+      });
       
       const itemsList = state.pendingOrder.items.map((item, i) => 
         `${i + 1}. ${item.productName} - ${item.quantity} units`
@@ -1214,16 +1221,23 @@ export class EnhancedWhatsAppService {
     } else if (action === 'create_order') {
       // Proceed with order creation
       state.currentFlow = 'creating_order';
-      state.pendingOrder = {
-        items: [{
-          productId: selectedProduct.id,
-          productName: selectedProduct.name,
-          sku: selectedProduct.sku || 'NA',
-          quantity,
-          unitPrice: selectedProduct.price
-        }],
-        step: 'collecting_items'
-      };
+      
+      // Initialize or add to existing order
+      if (!state.pendingOrder) {
+        state.pendingOrder = {
+          items: [],
+          step: 'collecting_items'
+        };
+      }
+      
+      // Add new item to existing order
+      state.pendingOrder.items.push({
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        sku: selectedProduct.sku || 'NA',
+        quantity,
+        unitPrice: selectedProduct.price
+      });
       
       const itemsList = state.pendingOrder.items.map((item, i) => 
         `${i + 1}. ${item.productName} - ${item.quantity} units`
@@ -1906,7 +1920,7 @@ export class EnhancedWhatsAppService {
             sections: [
               {
                 title: sectionTitle,
-                rows: rows.slice(0, 10).map(r => ({ id: r.id, title: r.title, description: r.description }))
+                rows: rows.map(r => ({ id: r.id, title: r.title, description: r.description }))
               }
             ]
           }
@@ -2079,15 +2093,15 @@ export class EnhancedWhatsAppService {
         return;
       }
       if (id === "main:check_stock") {
-        // Offer quick product list to check
+        // Offer product list to check - show all products
         const products = await storage.getProducts({});
-        const rows = products.slice(0, 10).map(p => ({ 
+        const rows = products.map(p => ({ 
           id: `product:check:${p.id}`, 
           title: p.name.length > 24 ? p.name.substring(0, 21) + '...' : p.name, 
           description: `SKU: ${p.sku}` 
         }));
         if (rows.length) {
-          await this.sendInteractiveList(userPhone, "Choose a product to view stock:", rows, "Select", "Products");
+          await this.sendInteractiveList(userPhone, `Choose a product to view stock (${products.length} products available):`, rows, "Select", "Products");
         } else {
           await this.sendWhatsAppMessage(userPhone, "No products found.");
         }
@@ -2171,7 +2185,10 @@ export class EnhancedWhatsAppService {
 
       // Order step helpers
       if (id === "order:add_more") {
-        state.pendingOrder = state.pendingOrder || { items: [], step: 'collecting_items' } as any;
+        // Preserve existing items when adding more
+        if (!state.pendingOrder) {
+          state.pendingOrder = { items: [], step: 'collecting_items' } as any;
+        }
         state.pendingOrder.step = 'collecting_items';
         await this.sendWhatsAppMessage(userPhone, "Add another item. Example: '5 units of bolts'");
         return;
